@@ -1,0 +1,5 @@
+config/config.js
+.env
+node_modules/
+*.orig
+*.backup-*
