@@ -1,0 +1,249 @@
+/* Config Sample
+ *
+ * For more information on how you can configure this file
+ * see https://docs.magicmirror.builders/configuration/introduction.html
+ * and https://docs.magicmirror.builders/modules/configuration.html
+ *
+ * You can use environment variables using a `config.js.template` file instead of `config.js`
+ * which will be converted to `config.js` while starting. For more information
+ * see https://docs.magicmirror.builders/configuration/introduction.html#enviromnent-variables
+ */
+let config = {
+	address: "localhost",	// Address to listen on, can be:
+							// - "localhost", "127.0.0.1", "::1" to listen on loopback interface
+							// - another specific IPv4/6 to listen on a specific interface
+							// - "0.0.0.0", "::" to listen on any interface
+							// Default, when address config is left out or empty, is "localhost"
+	port: 8080,
+	basePath: "/",	// The URL path where MagicMirror² is hosted. If you are using a Reverse proxy
+									// you must set the sub path here. basePath must end with a /
+	ipWhitelist: ["127.0.0.1", "::ffff:127.0.0.1", "::1"],	// Set [] to allow all IP addresses
+									// or add a specific IPv4 of 192.168.1.5 :
+									// ["127.0.0.1", "::ffff:127.0.0.1", "::1", "::ffff:192.168.1.5"],
+									// or IPv4 range of 192.168.3.0 --> 192.168.3.15 use CIDR format :
+									// ["127.0.0.1", "::ffff:127.0.0.1", "::1", "::ffff:192.168.3.0/28"],
+
+	useHttps: false,			// Support HTTPS or not, default "false" will use HTTP
+	httpsPrivateKey: "",	// HTTPS private key path, only require when useHttps is true
+	httpsCertificate: "",	// HTTPS Certificate path, only require when useHttps is true
+
+	language: "de",
+	locale: "de-DE",   // this variable is provided as a consistent location
+			   // it is currently only used by 3rd party modules. no MagicMirror code uses this value
+			   // as we have no usage, we  have no constraints on what this field holds
+			   // see https://en.wikipedia.org/wiki/Locale_(computer_software) for the possibilities
+
+	logLevel: ["INFO", "LOG", "WARN", "ERROR"], // Add "DEBUG" for even more logging
+	timeFormat: 24,
+	units: "metric",
+
+	modules: [
+		{
+			module: "alert",
+		},
+		{
+			module: "updatenotification",
+			position: "top_bar"
+		},
+		{
+			module: "clock",
+			position: "top_left"
+		},
+		{
+			module: "weather",
+			position: "top_right",
+			config: {
+				weatherProvider: "openmeteo",
+				type: "current",
+				lat: 48.1371,
+				lon: 11.5761
+			}
+		},
+		{
+			module: "weather",
+			position: "top_right",
+			header: "Wettervorhersage",
+			config: {
+				weatherProvider: "openmeteo",
+				type: "forecast",
+				lat: 48.1371,
+				lon: 11.5761
+			}
+		},
+		{
+			module: "newsfeed",
+			position: "bottom_bar",
+			config: {
+    feeds: [
+      { title: "Süddeutsche", url: "https://rss.sueddeutsche.de/rss/Alles" },
+      { title: "Tagesschau", url: "https://www.tagesschau.de/xml/rss2/" }
+    ],
+    showSourceTitle: true,
+    showPublishDate: false,
+    broadcastNewsFeeds: true,
+    broadcastNewsUpdates: true
+  }
+		},
+		{
+    module: "MMM-MVG",
+    position: "top_left",
+    header: "MVG",
+    config: {
+        station: "your_station",
+        maxEntries: 10,             // 10 items on screen
+        updateInterval: 30000,      // 60 s
+        showIcons: true,            // Show transport type icon
+        transportTypesToShow: {
+            "ubahn": true,            // show ubahn route
+            "sbahn": true,            // show sbahn route
+            "bus": true,              // show bus route
+            "regional_bus": true,     // show regional bus route
+            "tram": true              // show tram route
+        },
+        ignoreStations: [],         // lines with destination to which should not be shown
+        lineFiltering: {
+            "active": false, 			// set this to active if filtering should be used
+            "filterType": "whitelist", 	// whitelist = only specified lines will be displayed, blacklist = all lines except specified lines will be displayed
+            "lineNumbers": ["U1", "U3", "X50"] // lines that should be on the white-/blacklist
+        },
+        timeToWalk: 0,             // 10 min walking time to station. Default is 0
+        showWalkingTime: false,     // if the walking time should be included and the starting time is displayed
+        showTrainDepartureTime: true,             // show tran departure time
+        trainDepartureTimeFormat: "relative",     // format of the train departure time
+        walkingTimeFormat: "relative",            // format of the walking time
+        showInterruptions: true,				    // show interruptions as gray-out rows
+        showInterruptionsDetails: false,		    // show details of interruptions in next line
+        countInterruptionsAsItemShown: false,	    // count interruptions details lines as a line shown
+    }
+},
+    {
+      module: "MMM-RAIN-MAP",
+      position: "top_right",
+      config: {
+        animationSpeedMs: 800,
+        colorizeTime: true,
+        defaultZoomLevel: 6,
+        displayTime: true,
+        displayTimeline: true,
+        displayClockSymbol: true,
+        displayHoursBeforeRain: 0,
+        extraDelayLastFrameMs: 2000,
+        extraDelayCurrentFrameMs: 5000,
+        invertColors: false,
+        markers: [
+          { lat: 48.162, lng: 11.569, color: "red" }
+        ],
+        mapPositions: [
+          { lat: 48.162, lng: 11.569, zoom: 10, loops: 2 }
+          //,{ lat: 48.162, lng: 11.569, zoom: 4, loops: 2 }
+        ],
+        mapUrl: "https://a.tile.openstreetmap.de/{z}/{x}/{y}.png",
+        provider: "librewxr",
+        // For a self-hosted LibreWXR instance, use:
+        // provider: "librewxr",
+        // providerUrl: "http://192.168.1.20:8080",
+        mapHeight: "420px", // must be a pixel value (no percent)
+        mapWidth: "420px", // must be a pixel value (no percent)
+        maxHistoryFrames: 2,
+        maxForecastFrames: 4,
+        radarOpacity: 0.6,
+        substituteModules: [],
+        updateIntervalInSeconds: 600,
+      },
+    },
+	{
+  module: "MMM-MyGCalendar",
+  position: "lower_third",
+  config: {
+    calendars: [
+      {
+        name: "Personal",
+        url: "URL.ics"
+      }
+    ],
+	weekStartsOnMonday: true,
+	backgroundColor: `#616161`,
+    colorRules: [
+      { keyword: "standup",        color: "#039BE5" }, // Peacock
+      { keyword: "birthday",       color: "#E91E63" }, // Pink
+      { keyword: "gym|workout",    color: "#F4511E" }, // Tangerine
+      { keyword: "holiday",        color: "#0B8043" }, // Basil
+      { keyword: "flight|travel",  color: "#F6BF26" }, // Banana
+    ]
+  }
+},
+{
+	module: "MMM-QRCode",
+	position: "top_left",
+	header: "Gast-WLAN",
+  classes: "gastwlan",
+	config: {
+		text: "WIFI:T:WPA;S:wifi_name;P:password;;",
+		showRaw: false,
+		imageSize: 200
+	}
+},
+
+//Remotesteuerung Anzeige
+{
+	module: "MMM-Remote-Control",
+
+	config: {
+				apiKey: "api_key",
+				showModuleApiMenu: true,
+				secureEndpoints: true
+			}
+},
+
+	{
+		module: 'MMM-Globe',
+		position: 'lower_third',	// This can be any of the regions. Best results in lower_third
+		config: {
+                size:"large", // Globe size. See configuration options below for more options
+                dayLength: 28, // (Optional) Rotation speed. See configuration options below
+                viewAngle: 15, // (Optional) Globe tilt. See configuration options below.
+                locations: [ 
+					
+					// {lat: 48.1371,lon: 11.5761,label: "Hood Munich",color: "red",size: 0.5},
+                    // Fill with location Objects if desired
+                    // e.g.
+                    // {lat:37.77493,lng:-122.41942, label: "San Francisco"},
+                    // {lat:-23.5475,lng:-46.63611, label: "Sao Paulo"}
+                    
+                    // Individual values must be seperated by a comma. 
+                    // You can look up the latitude and longitude for a specific location on Google Maps.
+				]
+				}
+	},
+	  {
+	module: "MMM-pages",
+	config: {
+		timings: {
+			default: 10000
+		},
+		modules: [
+			["MMM-Globe"],
+			["MMM-MyGCalendar"]
+		],
+		fixed: [
+			"clock", "weather", "MMM-MVG", "newsfeed",
+			"alert", "updatenotification", "MMM-RAIN-MAP",
+			"MMM-page-indicator"
+		],
+		hiddenPages: {
+			"gast": ["MMM-QRCode"]
+		}
+	}
+},
+{
+        module: 'MMM-page-indicator',
+        position: 'lower_third',
+        config: {
+            		activeBright: true,
+        		}
+}
+]
+};
+
+/*************** DO NOT EDIT THE LINE BELOW ***************/
+if (typeof module !== "undefined") { module.exports = config; }
