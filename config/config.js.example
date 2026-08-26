@@ -41,6 +41,13 @@ let config = {
 		{
 			module: "alert",
 		},
+    {
+        module: 'MMM-page-indicator',
+        position: 'top_bar',
+        config: {
+            		activeBright: true,
+        		}
+},
 		{
 			module: "updatenotification",
 			position: "top_bar"
@@ -89,7 +96,7 @@ let config = {
     position: "top_left",
     header: "MVG",
     config: {
-        station: "your_station",
+        station: "Hauptbahnhof (Tief)", // Station name
         maxEntries: 10,             // 10 items on screen
         updateInterval: 30000,      // 60 s
         showIcons: true,            // Show transport type icon
@@ -149,7 +156,7 @@ let config = {
         radarOpacity: 0.6,
         substituteModules: [],
         updateIntervalInSeconds: 600,
-      },
+      }
     },
 	{
   module: "MMM-MyGCalendar",
@@ -158,7 +165,8 @@ let config = {
     calendars: [
       {
         name: "Personal",
-        url: "URL.ics"
+        url: "DEINE_GOOGLE_ICAL_URL",
+        color: "#4285F4"
       }
     ],
 	weekStartsOnMonday: true,
@@ -174,11 +182,12 @@ let config = {
 },
 {
 	module: "MMM-QRCode",
+  disabled: true,
 	position: "top_left",
 	header: "Gast-WLAN",
   classes: "gastwlan",
 	config: {
-		text: "WIFI:T:WPA;S:wifi_name;P:password;;",
+		text: "WIFI:T:WPA;S:FRITZ!Box Gastzugang;P:DEIN_WLAN_PASSWORT;;",
 		showRaw: false,
 		imageSize: 200
 	}
@@ -189,7 +198,7 @@ let config = {
 	module: "MMM-Remote-Control",
 
 	config: {
-				apiKey: "api_key",
+				apiKey: "DEIN_API_KEY",
 				showModuleApiMenu: true,
 				secureEndpoints: true
 			}
@@ -219,16 +228,15 @@ let config = {
 	module: "MMM-pages",
 	config: {
 		timings: {
-			default: 10000
+			default: 5000
 		},
 		modules: [
-			["MMM-Globe"],
-			["MMM-MyGCalendar"]
+			["weather", "newsfeed","alert", "updatenotification", "MMM-RAIN-MAP","MMM-MVG","MMM-Globe"],
+      ["weather", "newsfeed","alert", "updatenotification", "MMM-RAIN-MAP","MMM-MVG","MMM-MyGCalendar"],
+      ["MMM-LiveLyrics"]
 		],
 		fixed: [
-			"clock", "weather", "MMM-MVG", "newsfeed",
-			"alert", "updatenotification", "MMM-RAIN-MAP",
-			"MMM-page-indicator"
+			"clock","MMM-page-indicator"
 		],
 		hiddenPages: {
 			"gast": ["MMM-QRCode"]
@@ -236,11 +244,27 @@ let config = {
 	}
 },
 {
-        module: 'MMM-page-indicator',
-        position: 'lower_third',
-        config: {
-            		activeBright: true,
-        		}
+    /* Don't share your credentials! */
+    module: "MMM-OnSpotify",
+    position: 'top_left', /* bottom_left, bottom_center */
+    config: {
+        clientID: "DEINE_SPOTIFY_CLIENT_ID",
+        clientSecret: "DEIN_SPOTIFY_CLIENT_SECRET",
+        accessToken: "DEIN_ACCESS_TOKEN",
+        refreshToken: "DEIN_REFRESH_TOKEN",
+        /* Add here other configuration options */
+    },
+},
+{  
+  // This is the base config. See more config options below
+	module: "MMM-LiveLyrics",
+	position: "fullscreen_below", // Do not change position
+	config: {
+		accessToken: "DEIN_ACCESS_TOKEN", // Paste here your token
+    lyricsFillType: "fullCalcTopModules",
+    lyricsStyleTheme: "dynamicblobsFull",
+    
+	}
 }
 ]
 };
