@@ -43,6 +43,7 @@ let config = {
 		},
     {
         module: 'MMM-page-indicator',
+        disabled: true,
         position: 'top_bar',
         config: {
             		activeBright: true,
@@ -96,7 +97,7 @@ let config = {
     position: "top_left",
     header: "MVG",
     config: {
-        station: "Hauptbahnhof (Tief)", // Station name
+        station: "Hohenzollernplatz", // Station name
         maxEntries: 10,             // 10 items on screen
         updateInterval: 30000,      // 60 s
         showIcons: true,            // Show transport type icon
@@ -224,23 +225,30 @@ let config = {
 				]
 				}
 	},
+  {
+	module: "MMM-SpotifyPages",
+	config: {
+		spotifyPage: 2,
+		idlePages: [0, 1],
+		idleRotationMs: 10000,
+    statusRequest: { enabled: false },
+		debug: true
+	}
+},
 	  {
 	module: "MMM-pages",
 	config: {
-		timings: {
-			default: 5000
-		},
+		timings: { default: 0},
 		modules: [
-			["weather", "newsfeed","alert", "updatenotification", "MMM-RAIN-MAP","MMM-MVG","MMM-Globe"],
-      ["weather", "newsfeed","alert", "updatenotification", "MMM-RAIN-MAP","MMM-MVG","MMM-MyGCalendar"],
-      ["MMM-LiveLyrics"]
+	["MMM-MVG",       "MMM-MyGCalendar"],   // 0
+	["MMM-MVG",       "MMM-Globe"],         // 1
+	["MMM-OnSpotify", "MMM-LiveLyrics"]     // 2
 		],
 		fixed: [
-			"clock","MMM-page-indicator"
+			"clock", "weather", "newsfeed", "MMM-RAIN-MAP",
+			"alert", "updatenotification", "MMM-page-indicator"
 		],
-		hiddenPages: {
-			"gast": ["MMM-QRCode"]
-		}
+		hiddenPages: { gast: ["MMM-QRCode"] }
 	}
 },
 {
@@ -252,6 +260,9 @@ let config = {
         clientSecret: "DEIN_SPOTIFY_CLIENT_SECRET",
         accessToken: "DEIN_ACCESS_TOKEN",
         refreshToken: "DEIN_REFRESH_TOKEN",
+        //events: {
+			//"SPOTIFY_STATUS_REQUEST": "GET_PLAYING"
+		//}
         /* Add here other configuration options */
     },
 },

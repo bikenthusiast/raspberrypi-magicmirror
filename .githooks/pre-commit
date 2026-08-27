@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# pre-commit -- verhindert das Committen von Geheimnissen
+#
+# Installation (aus dem Repo-Wurzelverzeichnis):
+#
+#   mkdir -p .githooks
+#   cp pre-commit .githooks/pre-commit
+#   chmod +x .githooks/pre-commit
+#   git config core.hooksPath .githooks
+#
+# core.hooksPath sorgt dafuer, dass Git die Hooks aus dem versionierten
+# Verzeichnis nimmt statt aus .git/hooks/. Damit ist der Hook Teil des Repos
+# und nach einem Clone auf einem anderen Rechner sofort da -- dort muss nur
+# einmal das git config gesetzt werden.
+#
+# Umgehen (bewusst, in Ausnahmefaellen):  git commit --no-verify
+#
+set -uo pipefail
+
+# Muster, die auf ein echtes Geheimnis hindeuten.
+# Format: "Beschreibung|Regex (ERE)"
+PATTERNS=(
+	"Private Google-Kalender-URL (enthaelt Auth-Token)|calendar\.google\.com/calendar/ical/"
+	"iCal-Token|private-[0-9a-f]{20,}"
+	"API-Key als Hex-String|(apiKey|api_key|token|secret)[\"' ]*[:=][\"' ]*[0-9a-fA-F]{16,}"
+	"Spotify-Credential|(clientID|clientSecret|accessToken|refreshToken)[\"' ]*[:=][\"' ]*[A-Za-z0-9_-]{16,}"
+	"WLAN-Zeichenkette mit Passwort|WIFI:T:[^;]*;S:[^;]*;P:.+"
+	"E-Mail-Adresse|[a-zA-Z0-9._%+-]+@(gmail|googlemail|web|gmx|outlook|hotmail)\.[a-z]{2,}"
+	"AWS Access Key|AKIA[0-9A-Z]{16}"
+	"Privater Schluessel|-----BEGIN [A-Z ]*PRIVATE KEY-----"
+	"Generischer 32er-Hex-Key|[\"'][0-9a-f]{32}[\"']"
+)
+
+# Zeilen mit diesen Ausdruecken gelten als Platzhalter und werden ignoriert.
+ALLOWLIST='DEIN_|DEINE_|YOUR_|PLACEHOLDER|CHANGEME|<[a-z_]+>|\$\{[A-Z_]+\}|xxxx|example\.(com|org)|@example'
+
+# Dateien, die ohnehin nie committet werden sollen.
+FORBIDDEN_FILES='(^|/)(\.env|config\.js|credentials\.json|.*\.pem|.*\.key)$'
+
+RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'; GREEN=$'\033[0;32m'; NC=$'\033[0m'
+
+fail=0
+
+# --- 1. Verbotene Dateinamen -------------------------------------------------
+
+while IFS= read -r file; do
+	[[ -z "$file" ]] && continue
+	if [[ "$file" =~ $FORBIDDEN_FILES ]]; then
+		echo "${RED}BLOCKIERT${NC}  Datei gehoert nicht ins Repo: ${YELLOW}$file${NC}"
+		echo "          Aus dem Staging nehmen:  git rm --cached '$file'"
+		echo "          Und in .gitignore aufnehmen."
+		echo
+		fail=1
+	fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+# --- 2. Inhalte der hinzugefuegten Zeilen ------------------------------------
+
+# Nur hinzugefuegte Zeilen pruefen (beginnen mit +, aber nicht +++).
+# Der Dateiname wird aus den diff-Kopfzeilen mitgefuehrt, damit die Meldung
+# sagt, wo der Treffer sitzt.
+staged_added="$(git diff --cached -U0 | awk '
+	/^\+\+\+ b\// { file = substr($0, 7); next }
+	/^\+/ && !/^\+\+\+/ { print file "\t" substr($0, 2) }
+')"
+
+if [[ -n "$staged_added" ]]; then
+	for entry in "${PATTERNS[@]}"; do
+		desc="${entry%%|*}"
+		regex="${entry#*|}"
+
+		hits="$(printf '%s\n' "$staged_added" \
+			| grep -Ev -e "$ALLOWLIST" \
+			| grep -Ei -e "$regex" || true)"
+
+		if [[ -n "$hits" ]]; then
+			echo "${RED}BLOCKIERT${NC}  $desc"
+			printf '%s\n' "$hits" | head -5 | while IFS=$'\t' read -r f line; do
+				# Lange Zeilen kuerzen, damit das Terminal lesbar bleibt
+				short="$(printf '%.100s' "$line")"
+				echo "          ${YELLOW}${f}${NC}: ${short}"
+			done
+			echo
+			fail=1
+		fi
+	done
+fi
+
+# --- 3. Ergebnis -------------------------------------------------------------
+
+if (( fail )); then
+	cat <<-EOF
+	${RED}Commit abgebrochen.${NC}
+
+	Wenn es sich um ein echtes Geheimnis handelt:
+	  1. Wert aus der Datei entfernen und durch einen Platzhalter ersetzen
+	  2. Echten Wert in .env ablegen (chmod 600, in .gitignore)
+	  3. Geheimnis rotieren, falls es schon irgendwo sichtbar war
+
+	Wenn es ein Fehlalarm ist:
+	  - Platzhalter wie DEIN_API_KEY oder \${VAR} werden ignoriert
+	  - Oder einmalig umgehen:  git commit --no-verify
+
+	EOF
+	exit 1
+fi
+
+echo "${GREEN}pre-commit${NC}  keine Geheimnisse im Staging gefunden."
+exit 0
