@@ -1,5 +1,14 @@
+# Secrets -- niemals committen
 config/config.js
+config/config*.js
+!config/config.js.example
 .env
-node_modules/
+*.env
+
+# Backups
 *.orig
 *.backup-*
+*copy*
+*.bak
+
+node_modules/
