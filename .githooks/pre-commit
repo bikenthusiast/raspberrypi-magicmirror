@@ -33,8 +33,7 @@ PATTERNS=(
 )
 
 # Zeilen mit diesen Ausdruecken gelten als Platzhalter und werden ignoriert.
-ALLOWLIST='DEIN_|DEINE_|YOUR_|PLACEHOLDER|CHANGEME|<[a-z_]+>|\$\{[A-Z_]+\}|xxxx|example\.(com|org)|@example'
-
+ALLOWLIST='DEIN_|DEINE_|YOUR_|PLACEHOLDER|CHANGEME|<[a-z_]+>|\$\{[A-Z_]+\}|xxxx|example\.(com|org)|@example|Mein[A-Z]|mein[A-Z]|beispiel|Beispiel'
 # Dateien, die ohnehin nie committet werden sollen.
 FORBIDDEN_FILES='(^|/)(\.env|config\.js|credentials\.json|.*\.pem|.*\.key)$'
 
