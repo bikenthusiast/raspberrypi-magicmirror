@@ -1,0 +1,34 @@
+/* MMM-GuestWifi */
+
+.guestwifi {
+	text-align: center;
+}
+
+.guestwifi-code {
+	/* Weisser Rahmen: QR-Codes brauchen eine helle Ruhezone,
+	   sonst scannen viele Kameras auf schwarzem Grund nicht. */
+	background-color: #fff;
+	padding: 8px;
+	border-radius: 4px;
+	display: block;
+	margin: 0 auto;
+}
+
+.guestwifi-ssid {
+	margin-top: 8px;
+	font-size: 18px;
+	font-weight: 400;
+	color: #fff;
+}
+
+.guestwifi-caption {
+	margin-top: 4px;
+	font-size: 14px;
+	color: #999;
+}
+
+.guestwifi-error {
+	font-size: 14px;
+	color: #f66;
+	padding: 12px;
+}

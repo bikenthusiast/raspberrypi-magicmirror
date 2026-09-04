@@ -68,16 +68,28 @@ Module.register("MMM-SpotifyPages", {
 		// Modul, dessen lastStatus ausgewertet wird
 		spotifyModule: "MMM-OnSpotify",
 
+		// Solange eine versteckte Seite von MMM-pages aktiv ist, haelt
+		// sich dieses Modul komplett zurueck -- weder Rotation noch
+		// Spotify-Wechsel duerfen den QR-Code wegblenden.
+		respectHiddenPages: true,
+
+		// Automatisch zurueckschalten, wenn eine versteckte Seite so
+		// lange offen war. 0 schaltet die Automatik ab, dann bleibt sie
+		// bis zu einem LEAVE_HIDDEN_PAGE stehen.
+		hiddenPageTimeoutMs: 120000,
+
 		debug: false
 	},
 
 	start () {
 		this.playing = false;
 		this.idleIndex = 0;
+		this.hiddenActive = false;
 
 		this.graceTimer = null;
 		this.rotationTimer = null;
 		this.pollTimer = null;
+		this.hiddenTimer = null;
 
 		if (this.config.pollMs > 0) {
 			this.pollTimer = setInterval(
@@ -127,6 +139,8 @@ Module.register("MMM-SpotifyPages", {
 	},
 
 	poll () {
+		if (this.hiddenActive) return;
+
 		const state = this.readPlayingState();
 		if (state === null) return;
 
@@ -186,6 +200,13 @@ Module.register("MMM-SpotifyPages", {
 	// --- Seitenwechsel ------------------------------------------------
 
 	goToPage (index) {
+		// Letzte Sicherung: Solange eine versteckte Seite laeuft, wird
+		// nichts gesendet. Faengt auch Timer ab, die vor dem Einblenden
+		// gestartet wurden und erst danach feuern.
+		if (this.hiddenActive) {
+			this.log(`Seite ${index} unterdrueckt -- versteckte Seite aktiv`);
+			return;
+		}
 		// PAGE_SELECT loest das veraltete PAGE_CHANGED ab.
 		// MMM-pages verlangt einen echten Integer, kein String.
 		this.sendNotification("PAGE_SELECT", index);
@@ -219,7 +240,61 @@ Module.register("MMM-SpotifyPages", {
 
 	// --- Schneller Zusatzweg ueber die Notification --------------------
 
+	// --- Versteckte Seiten ---------------------------------------------
+
+	clearHiddenTimer () {
+		if (this.hiddenTimer) {
+			clearTimeout(this.hiddenTimer);
+			this.hiddenTimer = null;
+		}
+	},
+
+	enterHidden (pageName) {
+		this.clearHiddenTimer();
+		this.clearGrace();
+		this.stopRotation();
+		this.hiddenActive = true;
+		this.log(`versteckte Seite "${pageName}" aktiv -- Steuerung pausiert`);
+
+		if (this.config.hiddenPageTimeoutMs > 0) {
+			this.hiddenTimer = setTimeout(() => {
+				this.hiddenTimer = null;
+				this.log("Zeit abgelaufen -- verstecktes Seite wird verlassen");
+				this.sendNotification("LEAVE_HIDDEN_PAGE");
+			}, this.config.hiddenPageTimeoutMs);
+		}
+	},
+
+	leaveHidden () {
+		if (!this.hiddenActive) return;
+		this.clearHiddenTimer();
+		this.hiddenActive = false;
+		this.log("versteckte Seite verlassen -- Steuerung wieder aktiv");
+
+		// Zustand neu bestimmen, statt blind fortzusetzen: Waehrend der
+		// Pause kann die Wiedergabe gestartet oder geendet haben.
+		const state = this.readPlayingState();
+		if (state === true) {
+			this.playing = false;
+			this.showSpotify();
+		} else {
+			this.playing = false;
+			this.startRotation(true);
+		}
+	},
+
 	notificationReceived (notification, payload) {
+		if (this.config.respectHiddenPages) {
+			if (notification === "SHOW_HIDDEN_PAGE") {
+				this.enterHidden(typeof payload === "string" ? payload : "?");
+				return;
+			}
+			if (notification === "LEAVE_HIDDEN_PAGE") {
+				this.leaveHidden();
+				return;
+			}
+		}
+
 		if (notification !== "NOW_PLAYING") return;
 		if (!payload || typeof payload !== "object") return;
 
@@ -228,6 +303,10 @@ Module.register("MMM-SpotifyPages", {
 		// Wiedergabe uebernimmt ausschliesslich das Polling -- die
 		// Flanke playerIsEmpty kommt beim Pausieren nicht.
 		if (payload.playerIsEmpty === false) {
+			if (this.hiddenActive) {
+				this.log("Titelstart ignoriert -- versteckte Seite aktiv");
+				return;
+			}
 			this.log(`spielt: ${payload.artist} - ${payload.name}`);
 			this.showSpotify();
 		}
@@ -241,6 +320,7 @@ Module.register("MMM-SpotifyPages", {
 
 	stop () {
 		this.clearGrace();
+		this.clearHiddenTimer();
 		this.stopRotation();
 		if (this.pollTimer) clearInterval(this.pollTimer);
 	}

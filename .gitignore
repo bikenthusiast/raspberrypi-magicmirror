@@ -4,6 +4,7 @@ config/config*.js
 !config/config.js.example
 .env
 *.env
+modules/MMM-GuestWifi/guest-wifi.png
 
 # Backups
 *.orig
