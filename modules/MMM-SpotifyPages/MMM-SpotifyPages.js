@@ -73,6 +73,20 @@ Module.register("MMM-SpotifyPages", {
 		// Spotify-Wechsel duerfen den QR-Code wegblenden.
 		respectHiddenPages: true,
 
+		// Mindestabstand zwischen zwei Seitenwechseln in ms.
+		//
+		// MMM-pages blendet beim Wechsel mit setTimeout aus und wieder
+		// ein. Kommt waehrend dieser Animation ein zweiter Wechsel,
+		// kann die Freigabe fuer die alte Seite verlorengehen -- die
+		// Module bleiben dann mit einem lockString von MMM-pages
+		// gesperrt zurueck und sind dauerhaft unsichtbar, obwohl die
+		// Seite korrekt gesetzt ist.
+		//
+		// Auffaellig wird das beim Verlassen der Spotify-Seite: dort
+		// folgen der Wechsel zurueck und der erste Rotationsschritt
+		// dicht aufeinander.
+		minSwitchGapMs: 700,
+
 		// Automatisch zurueckschalten, wenn eine versteckte Seite so
 		// lange offen war. 0 schaltet die Automatik ab, dann bleibt sie
 		// bis zu einem LEAVE_HIDDEN_PAGE stehen.
@@ -90,6 +104,8 @@ Module.register("MMM-SpotifyPages", {
 		this.rotationTimer = null;
 		this.pollTimer = null;
 		this.hiddenTimer = null;
+		this.switchTimer = null;
+		this.lastSwitch = 0;
 
 		if (this.config.pollMs > 0) {
 			this.pollTimer = setInterval(
@@ -199,6 +215,11 @@ Module.register("MMM-SpotifyPages", {
 
 	// --- Seitenwechsel ------------------------------------------------
 
+	/**
+	 * Sendet PAGE_SELECT, aber nie zwei Wechsel dichter als
+	 * minSwitchGapMs hintereinander. Ein zu frueher zweiter Wechsel
+	 * laesst Module bei MMM-pages gesperrt zurueck.
+	 */
 	goToPage (index) {
 		// Letzte Sicherung: Solange eine versteckte Seite laeuft, wird
 		// nichts gesendet. Faengt auch Timer ab, die vor dem Einblenden
@@ -207,10 +228,40 @@ Module.register("MMM-SpotifyPages", {
 			this.log(`Seite ${index} unterdrueckt -- versteckte Seite aktiv`);
 			return;
 		}
+
+		const gap = this.config.minSwitchGapMs || 0;
+		const since = Date.now() - this.lastSwitch;
+
+		if (gap > 0 && since < gap) {
+			// Ein bereits wartender Wechsel wird verworfen -- es zaehlt
+			// immer der zuletzt gewuenschte Zustand.
+			if (this.switchTimer) clearTimeout(this.switchTimer);
+			const wait = gap - since;
+			this.log(`Seite ${index} in ${wait} ms (Animation laeuft noch)`);
+			this.switchTimer = setTimeout(() => {
+				this.switchTimer = null;
+				this.emitPage(index);
+			}, wait);
+			return;
+		}
+
+		this.emitPage(index);
+	},
+
+	emitPage (index) {
+		if (this.hiddenActive) return;
+		this.lastSwitch = Date.now();
 		// PAGE_SELECT loest das veraltete PAGE_CHANGED ab.
 		// MMM-pages verlangt einen echten Integer, kein String.
 		this.sendNotification("PAGE_SELECT", index);
 		this.log(`Seite ${index}`);
+	},
+
+	clearSwitchTimer () {
+		if (this.switchTimer) {
+			clearTimeout(this.switchTimer);
+			this.switchTimer = null;
+		}
 	},
 
 	clearGrace () {
@@ -252,6 +303,7 @@ Module.register("MMM-SpotifyPages", {
 	enterHidden (pageName) {
 		this.clearHiddenTimer();
 		this.clearGrace();
+		this.clearSwitchTimer();
 		this.stopRotation();
 		this.hiddenActive = true;
 		this.log(`versteckte Seite "${pageName}" aktiv -- Steuerung pausiert`);
@@ -321,6 +373,7 @@ Module.register("MMM-SpotifyPages", {
 	stop () {
 		this.clearGrace();
 		this.clearHiddenTimer();
+		this.clearSwitchTimer();
 		this.stopRotation();
 		if (this.pollTimer) clearInterval(this.pollTimer);
 	}
