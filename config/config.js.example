@@ -182,16 +182,10 @@ let config = {
   }
 },
 {
-	module: "MMM-QRCode",
-  disabled: true,
-	position: "top_left",
-	header: "Gast-WLAN",
-  classes: "gastwlan",
-	config: {
-		text: "WIFI:T:WPA;S:FRITZ!Box Gastzugang;P:DEIN_WLAN_PASSWORT;;",
-		showRaw: false,
-		imageSize: 200
-	}
+    module: "MMM-GuestWifi",
+    position: "middle_center",
+    header: "Gast-WLAN",
+    config: { imageSize: 440 }
 },
 
 //Remotesteuerung Anzeige
@@ -209,20 +203,10 @@ let config = {
 		module: 'MMM-Globe',
 		position: 'lower_third',	// This can be any of the regions. Best results in lower_third
 		config: {
-                size:"large", // Globe size. See configuration options below for more options
-                dayLength: 28, // (Optional) Rotation speed. See configuration options below
-                viewAngle: 15, // (Optional) Globe tilt. See configuration options below.
-                locations: [ 
-					
-					// {lat: 48.1371,lon: 11.5761,label: "Hood Munich",color: "red",size: 0.5},
-                    // Fill with location Objects if desired
-                    // e.g.
-                    // {lat:37.77493,lng:-122.41942, label: "San Francisco"},
-                    // {lat:-23.5475,lng:-46.63611, label: "Sao Paulo"}
-                    
-                    // Individual values must be seperated by a comma. 
-                    // You can look up the latitude and longitude for a specific location on Google Maps.
-				]
+        style: "centralAmericaDiscNat",
+        ownImagePath: "https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/1808x1808.jpg",
+        imageSize: 600,
+        updateInterval: 10 * 60 * 1000
 				}
 	},
   {
@@ -230,8 +214,8 @@ let config = {
 	config: {
 		spotifyPage: 2,
 		idlePages: [0, 1],
-		idleRotationMs: 10000,
-    statusRequest: { enabled: false },
+		idleRotationMs: 300000,
+		hiddenPageTimeoutMs: 60000,
 		debug: true
 	}
 },
@@ -248,7 +232,7 @@ let config = {
 			"clock", "weather", "newsfeed", "MMM-RAIN-MAP",
 			"alert", "updatenotification", "MMM-page-indicator"
 		],
-		hiddenPages: { gast: ["MMM-QRCode"] }
+		hiddenPages: { gast: ["MMM-GuestWifi"] }
 	}
 },
 {
@@ -260,10 +244,14 @@ let config = {
         clientSecret: "DEIN_SPOTIFY_CLIENT_SECRET",
         accessToken: "DEIN_ACCESS_TOKEN",
         refreshToken: "DEIN_REFRESH_TOKEN",
-        //events: {
-			//"SPOTIFY_STATUS_REQUEST": "GET_PLAYING"
-		//}
+        
         /* Add here other configuration options */
+        isPlaying: 5,
+        isEmpty: 10,
+        isPlayingHidden: 10,
+        isEmptyHidden: 30,
+        onReconnecting: 4,
+        onError: 8
     },
 },
 {  
