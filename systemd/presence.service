@@ -1,0 +1,48 @@
+# Presence detection: switches the mirror display via the radar sensor.
+#
+# Install:
+#   sudo cp systemd/presence.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now presence
+#
+# Watch:
+#   journalctl -u presence -f
+
+[Unit]
+Description=Presence detection for MagicMirror
+
+# The script calls MagicMirror's API, so it needs the server running.
+# "Wants" rather than "Requires": if MagicMirror is down, presence
+# should keep polling and log the failure rather than exit.
+After=network-online.target magicmirror.service
+Wants=network-online.target magicmirror.service
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+User=tobiask
+WorkingDirectory=/home/tobiask
+ExecStart=/usr/bin/python3 /home/tobiask/Projects/raspberrypi-magicmirror/scripts/presence.py
+Restart=on-failure
+Restart=on-failure
+RestartSec=30
+
+
+# GPIO pin carrying the sensor's OT2 output.
+Environment=PRESENCE_GPIO=27
+
+# Force factory unit
+Environment=GPIOZERO_PIN_FACTORY=lgpio
+
+# Seconds of no presence before the display is switched off.
+Environment=PRESENCE_GRACE=120
+
+# Debounce on the input, in seconds.
+Environment=PRESENCE_BOUNCE=0.5
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
