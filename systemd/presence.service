@@ -1,4 +1,4 @@
-# Presence detection: switches the mirror display via the radar sensor.
+# Presence detection: switches the mirror panel via HDMI-CEC.
 #
 # Install:
 #   sudo cp systemd/presence.service /etc/systemd/system/
@@ -11,35 +11,43 @@
 [Unit]
 Description=Presence detection for MagicMirror
 
-# The script calls MagicMirror's API, so it needs the server running.
-# "Wants" rather than "Requires": if MagicMirror is down, presence
-# should keep polling and log the failure rather than exit.
-After=network-online.target magicmirror.service
-Wants=network-online.target magicmirror.service
+# No dependency on magicmirror.service any more: switching goes
+# straight to the monitor over CEC, so presence detection works even
+# when the mirror itself is down.
+After=network-online.target
+Wants=network-online.target
+
 StartLimitBurst=5
 StartLimitIntervalSec=300
 
 [Service]
 Type=simple
 User=tobiask
+
+# lgpio writes a notification file to the working directory.
 WorkingDirectory=/home/tobiask
+
 ExecStart=/usr/bin/python3 /home/tobiask/Projects/raspberrypi-magicmirror/scripts/presence.py
+
 Restart=on-failure
-Restart=on-failure
+
+# 30 s rather than 10: a dying process needs time to release
+# /dev/gpiochip0, and a restart arriving too early cannot claim it.
 RestartSec=30
 
-
-# GPIO pin carrying the sensor's OT2 output.
-Environment=PRESENCE_GPIO=27
-
-# Force factory unit
+# gpiozero otherwise falls back to the "native" pin factory, which
+# uses the sysfs GPIO interface removed in recent kernels.
 Environment=GPIOZERO_PIN_FACTORY=lgpio
 
-# Seconds of no presence before the display is switched off.
+Environment=PRESENCE_GPIO=27
 Environment=PRESENCE_GRACE=120
-
-# Debounce on the input, in seconds.
 Environment=PRESENCE_BOUNCE=0.5
+Environment=PRESENCE_MIN_GAP=5
+
+# The Pi 4 exposes one CEC device per HDMI port. cec0 is the first
+# port, cec1 the second. The wrong one fails with errno=64 (ENONET).
+Environment=CEC_DEVICE=/dev/cec1
+Environment=CEC_TARGET=0
 
 NoNewPrivileges=true
 PrivateTmp=true

@@ -1,59 +1,74 @@
 #!/usr/bin/env python3
 """
-presence.py -- schaltet den Spiegel abhaengig vom Radarsensor
+presence.py -- switches the mirror panel based on the radar sensor
 
-Liest den digitalen Praesenzausgang (OT2) des Waveshare HMMD mmWave
-Sensors an GPIO 27 und ruft bei Zustandswechsel die Monitor-Endpunkte
-von MMM-Remote-Control auf.
+Reads the digital presence output (OT2) of the Waveshare HMMD mmWave
+sensor on GPIO 27 and puts the monitor into standby via HDMI-CEC when
+nobody is around.
 
-Verkabelung:
-    Sensor 3V3  ->  Pi Pin 1   (3,3 V)
-    Sensor GND  ->  Pi Pin 6   (Masse)
-    Sensor OT2  ->  Pi Pin 13  (GPIO 27)
+Wiring:
+    sensor 3V3  ->  Pi pin 17  (3.3 V, pin 1 is taken by the fan)
+    sensor GND  ->  Pi pin 9   (ground, pin 6 is taken by the fan)
+    sensor OT2  ->  Pi pin 13  (GPIO 27)
 
-Warum ueber die API und nicht direkt wlr-randr: MagicMirror weiss
-selbst, wie es seinen Bildschirm abschaltet, und im Server-Modus gibt
-es gar kein Display. Der Aufruf bleibt derselbe, egal ob spaeter
-Electron am HDMI-Ausgang laeuft oder nicht.
+Why CEC and not the compositor
+------------------------------
+Under labwc both `wlopm` and `wlr-randr --off` disable the output
+rather than putting the panel into standby. The compositor then
+creates a headless replacement output, and re-enabling the real one
+fails roughly half the time with "failed to apply configuration".
+Each cycle leaks another headless output.
 
-Displaysteuerung: MMM-Remote-Control ruft intern `wlopm --on '*'` bzw.
-`wlopm --off '*'` auf. Ohne laufende Wayland-Session -- also im
-Server-Modus ohne angeschlossenen Monitor -- schlaegt das mit
-"WAYLAND_DISPLAY is not set" fehl. Das ist erwartet und kein Fehler des
-Sensors; die Umschaltung greift, sobald ein Display am HDMI-Ausgang
-haengt.
+CEC sidesteps all of that. The command travels over pin 13 of the HDMI
+cable straight to the monitor's own controller, which handles standby
+itself. The Pi's output stays configured and enabled throughout --
+`wlr-randr` reports `Enabled: yes` before and after. There is nothing
+to re-apply, so there is nothing to fail.
 
-Abhaengigkeiten:
-    sudo apt install python3-gpiozero python3-lgpio
+Cost: waking the panel takes two to three seconds. That is the
+monitor's own wake-up time, the same as pressing its power button.
+
+Note on the device node
+-----------------------
+The Pi 4 has two HDMI ports and exposes one CEC device per port.
+`/dev/cec0` is the first port, `/dev/cec1` the second. Addressing the
+wrong one fails with errno=64 (ENONET) and no further explanation.
+
+Requirements:
+    sudo apt install python3-gpiozero python3-lgpio v4l-utils
+    user must be in the "video" group to open /dev/cec*
 """
 
 import logging
 import os
 import signal
+import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
-from pathlib import Path
 
 from gpiozero import Button
 
-# --- Konfiguration ---------------------------------------------------
+# --- Configuration ---------------------------------------------------
 
 GPIO_PIN = int(os.environ.get("PRESENCE_GPIO", "27"))
 
-# Wartezeit in Sekunden, bevor nach dem letzten Erkennen abgeschaltet
-# wird. Verhindert Flackern, wenn der Sensor kurz aussetzt -- etwa
-# weil jemand sich abwendet.
+# Seconds without detection before the panel is switched off.
 GRACE_SECONDS = int(os.environ.get("PRESENCE_GRACE", "120"))
 
-# Entprellung des Eingangs in Sekunden. Kurze Stoerimpulse loesen
-# damit keinen Zustandswechsel aus.
+# Input debounce in seconds. Short glitches cause no state change.
 BOUNCE_SECONDS = float(os.environ.get("PRESENCE_BOUNCE", "0.5"))
 
-MM_HOST = os.environ.get("MM_HOST", "http://localhost:8080")
-ENV_FILE = Path(os.environ.get("MM_ENV", Path.home() / "Projects/MagicMirror/.env"))
-CONFIG_JS = Path.home() / "Projects/MagicMirror/config/config.js"
+# Minimum gap between two switches. Rapid toggling gives the panel no
+# time to settle and produces visible flicker.
+MIN_SWITCH_GAP = float(os.environ.get("PRESENCE_MIN_GAP", "5"))
+
+CEC_DEVICE = os.environ.get("CEC_DEVICE", "/dev/cec1")
+
+# Logical CEC address of the monitor. 0 is always the display.
+CEC_TARGET = os.environ.get("CEC_TARGET", "0")
+
+# Name the mirror announces on the CEC bus.
+CEC_OSD_NAME = os.environ.get("CEC_OSD_NAME", "MagicMirror")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,117 +78,78 @@ logging.basicConfig(
 log = logging.getLogger("presence")
 
 
-def read_api_key():
-    """API-Key aus .env lesen, ersatzweise aus der config.js."""
-    if ENV_FILE.is_file():
-        for line in ENV_FILE.read_text().splitlines():
-            if line.startswith("MM_REMOTE_API_KEY="):
-                key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                if key:
-                    return key
+# --- CEC -------------------------------------------------------------
 
-    if CONFIG_JS.is_file():
-        import re
-        m = re.search(r'apiKey:\s*"([^"]+)"', CONFIG_JS.read_text())
-        if m:
-            return m.group(1)
-
-    log.error("Kein API-Key gefunden. Erwartet in %s oder %s", ENV_FILE, CONFIG_JS)
-    sys.exit(1)
-
-
-API_KEY = read_api_key()
-
-
-# Merker, damit die Hinweise zu fehlendem Display und nicht laufendem
-# MagicMirror nur einmal statt bei jedem Wechsel im Log stehen.
-_warned = set()
-
-
-def warn_once(key, message, *args):
-    if key not in _warned:
-        _warned.add(key)
-        log.warning(message, *args)
-
-
-def call(path):
-    """Endpunkt aufrufen. Fehler werden geloggt, nicht geworfen --
-    ein nicht laufender MagicMirror darf den Dienst nicht beenden.
-
-    Rueckgabe True nur, wenn die Umschaltung tatsaechlich stattfand.
-    MMM-Remote-Control antwortet auch mit HTTP 200, wenn der interne
-    Aufruf von wlopm fehlgeschlagen ist -- deshalb wird der Body
-    ausgewertet, nicht nur der Statuscode."""
-    url = f"{MM_HOST}{path}?apiKey={API_KEY}"
+def run_cec(args, timeout=15):
+    """Run cec-ctl. Returns (ok, combined output)."""
+    cmd = ["cec-ctl", "-d", CEC_DEVICE] + args
     try:
-        with urllib.request.urlopen(url, timeout=5) as r:
-            body = r.read().decode(errors="replace")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode(errors="replace")
-        if e.code == 401 or "Wrong API Key" in body:
-            log.error("API-Key wird abgelehnt. Stimmt MM_REMOTE_API_KEY?")
-            return False
-        body_lower = body.lower()
-        if "wayland_display" in body_lower:
-            warn_once(
-                "nodisplay",
-                "Kein Display angeschlossen -- MagicMirror kann den Bildschirm "
-                "nicht schalten (WAYLAND_DISPLAY nicht gesetzt). Die "
-                "Praesenzerkennung selbst funktioniert; die Umschaltung greift, "
-                "sobald ein Monitor am HDMI-Ausgang haengt. Weitere Meldungen "
-                "dieser Art werden unterdrueckt.",
-            )
-            return False
-        log.warning("Aufruf abgelehnt (%s, HTTP %d): %s", path, e.code, body.strip())
-        return False
-    except urllib.error.URLError as e:
-        reason = getattr(e, "reason", e)
-        if isinstance(reason, ConnectionRefusedError) or "refused" in str(reason).lower():
-            warn_once(
-                "notrunning",
-                "MagicMirror ist nicht erreichbar unter %s. Laeuft der Server? "
-                "Weitere Meldungen dieser Art werden unterdrueckt.",
-                MM_HOST,
-            )
-        else:
-            log.warning("Aufruf fehlgeschlagen (%s): %s", path, reason)
-        return False
-
-    # Erfolgreich zugestellt, aber intern gescheitert
-    low = body.lower()
-    if "wayland_display" in low:
-        warn_once(
-            "nodisplay",
-            "Kein Display angeschlossen -- MagicMirror kann den Bildschirm nicht "
-            "schalten (WAYLAND_DISPLAY nicht gesetzt). Die Praesenzerkennung "
-            "selbst funktioniert; die Umschaltung greift, sobald ein Monitor am "
-            "HDMI-Ausgang haengt. Weitere Meldungen dieser Art werden "
-            "unterdrueckt.",
-        )
-        return False
-    if '"success":false' in low.replace(" ", ""):
-        log.warning("Umschaltung abgelehnt (%s): %s", path, body.strip())
-        return False
-
-    _warned.discard("nodisplay")
-    _warned.discard("notrunning")
-    return True
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        out = (r.stdout or "") + (r.stderr or "")
+        return r.returncode == 0, out
+    except FileNotFoundError:
+        log.error("cec-ctl not found. Install with: sudo apt install v4l-utils")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
+    except OSError as e:
+        return False, str(e)
 
 
-# --- Zustandslogik ---------------------------------------------------
+def configure_cec():
+    """Claim a logical address on the CEC bus.
+
+    Without this cec-ctl refuses to transmit with "Adapter is
+    unconfigured". The configuration does not survive a reboot, and it
+    can be lost if the adapter resets -- hence the retry in switch()."""
+    ok, out = run_cec(["--playback", "--osd-name", CEC_OSD_NAME])
+    if ok:
+        log.info("CEC adapter configured on %s", CEC_DEVICE)
+    else:
+        log.warning("Could not configure CEC adapter: %s", out.strip()[:200])
+    return ok
+
+
+def switch(on):
+    """Switch the panel. Reconfigures and retries once if the adapter
+    has lost its logical address."""
+    action = ["--to", CEC_TARGET, "--image-view-on" if on else "--standby"]
+
+    ok, out = run_cec(action)
+    if not ok and "unconfigured" in out.lower():
+        log.info("CEC adapter lost its address, reconfiguring")
+        configure_cec()
+        ok, out = run_cec(action)
+
+    if ok:
+        log.info("Panel %s", "on" if on else "standby")
+    else:
+        log.warning("Switching failed: %s", out.strip()[:200])
+    return ok
+
+
+# --- State -----------------------------------------------------------
 
 class Mirror:
     def __init__(self):
-        # Beim Start unbekannt -- der erste Wechsel setzt den Zustand.
+        # Unknown at start; the first transition establishes it.
         self.on = None
         self.off_at = None
+        self.last_switch = 0.0
+
+    def _too_soon(self):
+        return (time.monotonic() - self.last_switch) < MIN_SWITCH_GAP
 
     def turn_on(self):
         self.off_at = None
         if self.on is True:
             return
-        log.info("Anwesenheit erkannt -- Display ein")
-        if call("/api/monitor/on"):
+        if self._too_soon():
+            log.info("Presence detected, waiting out the minimum gap")
+            return
+        log.info("Presence detected")
+        self.last_switch = time.monotonic()
+        if switch(True):
             self.on = True
 
     def schedule_off(self):
@@ -181,37 +157,46 @@ class Mirror:
             return
         if self.off_at is None:
             self.off_at = time.monotonic() + GRACE_SECONDS
-            log.info("Niemand da -- Abschaltung in %d s", GRACE_SECONDS)
+            log.info("Nobody present, switching off in %d s", GRACE_SECONDS)
 
     def tick(self):
         if self.off_at and time.monotonic() >= self.off_at:
             self.off_at = None
-            log.info("Nachlaufzeit abgelaufen -- Display aus")
-            if call("/api/monitor/off"):
+            if self._too_soon():
+                # Try again on the next tick.
+                self.off_at = time.monotonic() + MIN_SWITCH_GAP
+                return
+            log.info("Grace period elapsed")
+            self.last_switch = time.monotonic()
+            if switch(False):
                 self.on = False
 
 
 def main():
+    configure_cec()
     mirror = Mirror()
 
-    # pull_up=False: der Sensor treibt den Pin aktiv auf 3,3 V bei
-    # Anwesenheit. Ein interner Pulldown haelt ihn sonst auf low.
+    # pull_up=False: the sensor actively drives the pin to 3.3 V on
+    # detection. An internal pull-down holds it low otherwise.
     sensor = Button(GPIO_PIN, pull_up=False, bounce_time=BOUNCE_SECONDS)
 
     sensor.when_pressed = mirror.turn_on
     sensor.when_released = mirror.schedule_off
 
-    log.info("Gestartet. GPIO %d, Nachlaufzeit %d s", GPIO_PIN, GRACE_SECONDS)
+    log.info(
+        "Started. GPIO %d, grace %d s, min gap %.0f s, CEC %s",
+        GPIO_PIN, GRACE_SECONDS, MIN_SWITCH_GAP, CEC_DEVICE,
+    )
 
-    # Ausgangszustand einmalig auswerten, damit der Spiegel nach einem
-    # Neustart nicht im falschen Zustand haengt.
+    # Evaluate the initial state so the panel is not left inverted
+    # after a restart.
     if sensor.is_pressed:
         mirror.turn_on()
     else:
         mirror.schedule_off()
 
     def shutdown(signum, frame):
-        log.info("Beende.")
+        log.info("Stopping.")
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, shutdown)
