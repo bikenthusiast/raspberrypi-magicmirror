@@ -1,0 +1,16 @@
+[Unit]
+Description=MagicMirror (Electron)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/tobiask/Projects/MagicMirror
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=15
+StandardOutput=append:/home/tobiask/Projects/MagicMirror/logs/magicmirror.log
+StandardError=append:/home/tobiask/Projects/MagicMirror/logs/magicmirror.log
+
+[Install]
+WantedBy=default.target
