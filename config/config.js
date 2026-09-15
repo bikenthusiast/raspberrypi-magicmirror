@@ -8,6 +8,7 @@
  * which will be converted to `config.js` while starting. For more information
  * see https://docs.magicmirror.builders/configuration/introduction.html#enviromnent-variables
  */
+const s = require(require("os").homedir() + "/Projects/raspberrypi-magicmirror/config/secrets.js");
 let config = {
 	address: "localhost",	// Address to listen on, can be:
 							// - "localhost", "127.0.0.1", "::1" to listen on loopback interface
@@ -97,7 +98,7 @@ let config = {
     position: "top_left",
     header: "MVG",
     config: {
-        station: "Hauptbahnhof", // Station name
+        station: s.mvgStation, // Station name
         maxEntries: 10,             // 10 items on screen
         updateInterval: 30000,      // 60 s
         showIcons: true,            // Show transport type icon
@@ -166,7 +167,7 @@ let config = {
     calendars: [
       {
         name: "Personal",
-        url: "DEINE_GOOGLE_ICAL_URL",
+        url: s.calenderUrl,
         color: "#4285F4"
       }
     ],
@@ -193,7 +194,7 @@ let config = {
 	module: "MMM-Remote-Control",
 
 	config: {
-				apiKey: "DEIN_API_KEY",
+				apiKey: s.remoteApiKey,
 				showModuleApiMenu: true,
 				secureEndpoints: true
 			}
@@ -240,10 +241,10 @@ let config = {
     module: "MMM-OnSpotify",
     position: 'top_left', /* bottom_left, bottom_center */
     config: {
-        clientID: "DEINE_SPOTIFY_CLIENT_ID",
-        clientSecret: "DEIN_SPOTIFY_CLIENT_SECRET",
-        accessToken: "DEIN_ACCESS_TOKEN",
-        refreshToken: "DEIN_REFRESH_TOKEN",
+       clientID: s.spotifyClientId,
+        clientSecret: s.spotifyClientSecret,
+        accessToken: s.spotifyAccessToken,
+        refreshToken:s.spotifyRefreshToken,
         
         /* Add here other configuration options */
         isPlaying: 5,
@@ -259,7 +260,7 @@ let config = {
 	module: "MMM-LiveLyrics",
 	position: "fullscreen_below", // Do not change position
 	config: {
-		accessToken: "DEIN_ACCESS_TOKEN", // Paste here your token
+		accessToken: s.geniusAccessToken, // Paste here your token
     lyricsFillType: "fullCalcTopModules",
     lyricsStyleTheme: "dynamicblobsFull",
     
