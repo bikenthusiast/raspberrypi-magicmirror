@@ -1,0 +1,29 @@
+# Module manifest for bootstrap.sh
+#
+# Format:  <folder> <repo-url> [<commit>]
+#
+# The commit is optional. Without it the default branch is cloned --
+# convenient, but not reproducible. Fill in the hashes once the build
+# is known good:
+#
+#   cd ~/Projects/MagicMirror/modules
+#   for d in MMM-*; do
+#     [ -d "$d/.git" ] && echo "$d $(git -C "$d" rev-parse --short HEAD)"
+#   done
+#
+# Why pins matter here: MMM-RAIN-MAP changed data source when
+# RainViewer's free API went away, and MMM-Globe's EUMETSAT URLs are
+# dead. Without pins a rebuild in six months gets different code.
+#
+# MMM-SpotifyPages and MMM-GuestWifi are not listed -- they live in
+# this repo and are symlinked into place instead.
+
+MMM-MVG              https://github.com/KoblerS/MMM-MVG
+MMM-RAIN-MAP         https://github.com/jalibu/MMM-RAIN-MAP
+MMM-Remote-Control   https://github.com/Jopyth/MMM-Remote-Control
+MMM-pages            https://github.com/edward-shen/MMM-pages
+MMM-page-indicator   https://github.com/edward-shen/MMM-page-indicator
+MMM-Globe            https://github.com/LukeSkywalker92/MMM-Globe
+MMM-MyGCalendar      https://github.com/johnster000/MMM-MyGCalendar
+MMM-OnSpotify        https://github.com/Fabrizz/MMM-OnSpotify
+MMM-LiveLyrics       https://github.com/Fabrizz/MMM-LiveLyrics
