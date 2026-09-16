@@ -25,5 +25,12 @@ module.exports = {
 	geniusAccessToken: "",
 
 	// MVG stop name, exactly as the MVG spells it.
+	
 	mvgStation: "",
+	// openweathermap.org -> API keys (One Call 3.0)
+	openWeatherApiKey: "",
+
+	// City-level coordinates for weather, rain map and globe.
+	cityLatitude: 0.0,
+	cityLongitude: 0.0,
 };
