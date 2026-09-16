@@ -59,27 +59,6 @@ let config = {
 			position: "top_left"
 		},
 		{
-			module: "weather",
-			position: "top_right",
-			config: {
-				weatherProvider: "openmeteo",
-				type: "current",
-				lat: 48.1371,
-				lon: 11.5761
-			}
-		},
-		{
-			module: "weather",
-			position: "top_right",
-			header: "Wettervorhersage",
-			config: {
-				weatherProvider: "openmeteo",
-				type: "forecast",
-				lat: 48.1371,
-				lon: 11.5761
-			}
-		},
-		{
 			module: "newsfeed",
 			position: "bottom_bar",
 			config: {
@@ -99,7 +78,7 @@ let config = {
     header: "MVG",
     config: {
         station: s.mvgStation, // Station name
-        maxEntries: 10,             // 10 items on screen
+        maxEntries: 8,             // 10 items on screen
         updateInterval: 30000,      // 60 s
         showIcons: true,            // Show transport type icon
         transportTypesToShow: {
@@ -125,6 +104,24 @@ let config = {
         countInterruptionsAsItemShown: false,	    // count interruptions details lines as a line shown
     }
 },
+{
+    module: "MMM-OpenWeatherMapForecast",
+    position: "top_right",
+    header: "Wetter",
+    config: {
+        apikey: s.openWeatherApiKey,
+        endpoint: "https://api.openweathermap.org/data/3.0/onecall",
+        latitude: s.cityLatitude,
+        longitude: s.cityLongitude,
+        units: "metric",
+        language: "de",
+        iconset: "4c",
+        useAnimatedIcons: true,
+        forecastLayout: "table",
+        updateInterval: 10,
+        label_timeFormat: "HH:mm"
+    }
+},
     {
       module: "MMM-RAIN-MAP",
       position: "top_right",
@@ -135,16 +132,15 @@ let config = {
         displayTime: true,
         displayTimeline: true,
         displayClockSymbol: true,
-        displayHoursBeforeRain: 0,
+        displayHoursBeforeRain: 2,
         extraDelayLastFrameMs: 2000,
         extraDelayCurrentFrameMs: 5000,
         invertColors: false,
         markers: [
-          { lat: 48.137, lng: 11.576, color: "red" }
+          { lat: s.cityLatitude, lng: s.cityLongitude, color: "red" }
         ],
         mapPositions: [
-          { lat: 48.137, lng: 11.576, zoom: 10, loops: 2 }
-          //,{ lat: 48.137, lng: 11.576, zoom: 4, loops: 2 }
+          { lat: s.cityLatitude, lng: s.cityLongitude, zoom: 10, loops: 2 }
         ],
         mapUrl: "https://a.tile.openstreetmap.de/{z}/{x}/{y}.png",
         provider: "librewxr",
@@ -167,7 +163,7 @@ let config = {
     calendars: [
       {
         name: "Personal",
-        url: s.calenderUrl,
+        url: s.calendarUrl,
         color: "#4285F4"
       }
     ],
@@ -199,7 +195,6 @@ let config = {
 				secureEndpoints: true
 			}
 },
-
 	{
 		module: 'MMM-Globe',
 		position: 'lower_third',	// This can be any of the regions. Best results in lower_third
@@ -225,13 +220,12 @@ let config = {
 	config: {
 		timings: { default: 0},
 		modules: [
-	["MMM-MVG",       "MMM-MyGCalendar"],   // 0
-	["MMM-MVG",       "MMM-Globe"],         // 1
-	["MMM-OnSpotify", "MMM-LiveLyrics"]     // 2
+	["MMM-MVG","MMM-MyGCalendar", "MMM-OpenWeatherMapForecast","MMM-RAIN-MAP"],   // 0
+	["MMM-MVG",       "MMM-Globe","MMM-OpenWeatherMapForecast","MMM-RAIN-MAP"],         // 1
+	["MMM-MVG","MMM-OnSpotify", "MMM-LiveLyrics","MMM-OpenWeatherMapForecast"]     // 2
 		],
 		fixed: [
-			"clock", "weather", "newsfeed", "MMM-RAIN-MAP",
-			"alert", "updatenotification", "MMM-page-indicator"
+			"clock", "newsfeed","alert", "updatenotification",
 		],
 		hiddenPages: { gast: ["MMM-GuestWifi"] }
 	}
@@ -263,6 +257,8 @@ let config = {
 		accessToken: s.geniusAccessToken, // Paste here your token
     lyricsFillType: "fullCalcTopModules",
     lyricsStyleTheme: "dynamicblobsFull",
+    updateTopModulesCalcOnData: true,
+    showConnectionQrOnLoad: false,
     
 	}
 }
