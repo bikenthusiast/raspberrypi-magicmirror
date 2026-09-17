@@ -1,0 +1,82 @@
+# MagicMirror – architecture (Mermaid, entspricht der SVG)
+
+Gleicher Inhalt wie `magicmirror-architecture.svg`: zehn Module, Radar über GPIO, OpenWeather bei den externen Diensten. GitHub rendert den Block direkt.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "lineColor": "#7A7A74", "clusterBkg": "#FBFBF9", "clusterBorder": "#A9A9A2", "edgeLabelBackground": "#FBFBF9"}}}%%
+flowchart TB
+  subgraph DEV["Development"]
+    direction LR
+    MAC["<b>Mac</b><br/>VS Code Remote-SSH"] ~~~ GH["<b>GitHub</b><br/>raspberrypi-magicmirror"]
+  end
+
+  subgraph PI["Raspberry Pi 4B (8 GB) · Raspberry Pi OS Trixie, arm64"]
+    direction TB
+    UNIT["<b>magicmirror-user.service</b><br/>systemd user service"] --> WL["<b>labwc (Wayland) + kanshi</b><br/>compositor, portrait rotation"]
+    WL --> MM["<b>MagicMirror² (Electron)</b><br/>UI and module host"]
+    MM --> MODS
+
+    subgraph MODS["Modules"]
+      direction LR
+      subgraph INFO["Information"]
+        direction TB
+        CAL["MMM-MyGCalendar"]
+        OWM["MMM-OpenWeatherMapForecast"]
+        RAIN["MMM-RAIN-MAP"]
+        MVG["MMM-MVG"]
+        GLOBE["MMM-Globe"]
+      end
+      subgraph MUSIC["Music"]
+        direction TB
+        SPOT["MMM-OnSpotify"]
+        LYR["MMM-LiveLyrics"]
+      end
+      subgraph CTRL["Pages"]
+        direction TB
+        PAGES["MMM-pages"]
+      end
+      subgraph OWN["Custom modules"]
+        direction TB
+        SP["<b>MMM-SpotifyPages</b><br/>page switching by playback"]
+        GW["<b>MMM-GuestWifi</b><br/>guest Wi-Fi QR code"]
+      end
+    end
+  end
+
+  subgraph HW["Hardware"]
+    direction LR
+    WP["<b>Witty Pi 4 Mini</b><br/>on 07:30, off 22:15"]
+    RAD["<b>mmWave radar</b><br/>presence via GPIO"]
+    MON["<b>MSI 27″ monitor</b><br/>2560×1440, portrait"]
+    GLASS["<b>Two-way mirror</b><br/>laminated safety glass"]
+  end
+
+  subgraph EXT["External services"]
+    direction LR
+    SAPI[("Spotify Web API")]
+    OAPI[("OpenWeather")]
+    LAPI[("Lyrics API")]
+  end
+
+  DEV -- "SSH" --> PI
+  MODS ~~~ HW
+  WP ~~~ MON
+  RAD ~~~ GLASS
+  PI -- "GPIO · HDMI + CEC · power" --- HW
+  MODS -- "HTTPS" --> EXT
+
+  classDef dev  fill:#EEF0F3,stroke:#8A94A6,color:#2F3A4A
+  classDef sw   fill:#E7EDF5,stroke:#8198B8,color:#2C3E5C
+  classDef com  fill:#F4EFE5,stroke:#BBA884,color:#574829
+  classDef own  fill:#F5E9E5,stroke:#C39284,color:#6B3A2E
+  classDef hw   fill:#EFEBF4,stroke:#9D92B5,color:#433A5C
+  classDef ext  fill:#EEF1E6,stroke:#9DA883,color:#45502E
+
+  class MAC,GH dev
+  class UNIT,WL,MM sw
+  class CAL,OWM,RAIN,MVG,GLOBE,SPOT,LYR,PAGES com
+  class SP,GW own
+  class WP,RAD,MON,GLASS hw
+  class SAPI,OAPI,LAPI ext
+  style PI fill:#EEF4F1,stroke:#86AA9F,color:#2E5048
+```
