@@ -119,7 +119,14 @@ let config = {
         useAnimatedIcons: true,
         forecastLayout: "table",
         updateInterval: 10,
-        label_timeFormat: "HH:mm"
+        label_timeFormat: "HH:MM",
+        // German labels
+        label_days: ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
+        label_high: "H",
+        label_low: "T",
+        label_maximum: "max",
+        label_ordinals: ["N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO",
+                         "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
     }
 },
     {
@@ -132,7 +139,7 @@ let config = {
         displayTime: true,
         displayTimeline: true,
         displayClockSymbol: true,
-        displayHoursBeforeRain: 2,
+        displayHoursBeforeRain: 0,
         extraDelayLastFrameMs: 2000,
         extraDelayCurrentFrameMs: 5000,
         invertColors: false,
@@ -220,12 +227,12 @@ let config = {
 	config: {
 		timings: { default: 0},
 		modules: [
-	["MMM-MVG","MMM-MyGCalendar", "MMM-OpenWeatherMapForecast","MMM-RAIN-MAP"],   // 0
-	["MMM-MVG",       "MMM-Globe","MMM-OpenWeatherMapForecast","MMM-RAIN-MAP"],         // 1
-	["MMM-MVG","MMM-OnSpotify", "MMM-LiveLyrics","MMM-OpenWeatherMapForecast"]     // 2
+	["MMM-MVG","MMM-MyGCalendar", "MMM-OpenWeatherMapForecast","MMM-RAIN-MAP", "newsfeed"],   // 0
+	["MMM-MVG",       "MMM-Globe","MMM-OpenWeatherMapForecast","MMM-RAIN-MAP", "newsfeed"],         // 1
+	["MMM-MVG", "MMM-LiveLyrics","MMM-OpenWeatherMapForecast"]     // 2
 		],
 		fixed: [
-			"clock", "newsfeed","alert", "updatenotification",
+			"clock","alert", "updatenotification",
 		],
 		hiddenPages: { gast: ["MMM-GuestWifi"] }
 	}
