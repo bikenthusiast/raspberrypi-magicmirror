@@ -1,14 +1,30 @@
-# Secrets -- niemals committen
+# --- Secrets: never commit ------------------------------------------
+config/secrets.js
 
-config/config.js.example
-.env
-*.env
+# QR code encodes the guest Wi-Fi password
 modules/MMM-GuestWifi/guest-wifi.png
 
-# Backups
-*.orig
-*.backup-*
-*copy*
-*.bak
+# --- Media: keep large files out of history -------------------------
+*.mp4
+*.mov
 
+# --- Backups --------------------------------------------------------
+*.orig
+*.bak
+*.backup-*
+* copy*
+* Kopie*
+
+# --- Runtime & logs -------------------------------------------------
+logs/
+*.log
+
+# --- Dependencies & build -------------------------------------------
 node_modules/
+__pycache__/
+*.pyc
+
+# --- OS & editor ----------------------------------------------------
+.DS_Store
+.vscode/
+*.swp

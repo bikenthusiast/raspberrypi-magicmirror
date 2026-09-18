@@ -67,12 +67,13 @@ Full installation, from a fresh Raspberry Pi OS image to a running mirror:
 |-------|-------|
 | `MMM-SpotifyPages`| Invisible controller. Reads the playback state and drives `MMM-pages` — the state machine described above. |
 | `MMM-GuestWifi`| Renders a Wi-Fi QR code on a hidden page, so guests can join without being told the password. |
-| `MMM-pages`| Splits modules across pages and handles switching, including hidden pages. Its own rotation is disabled — this setup drives it. | 
+
 
 ### Third-party modules
 
 | Module | Purpose |
 |---|---|
+| `MMM-pages`| Splits modules across pages and handles switching, including hidden pages. Its own rotation is disabled — this setup drives it. | 
 | [`MMM-MyGCalendar`](https://github.com/johnster000/MMM-MyGCalendar) | Calendar view against a private iCal feed, with keyword-based colour rules and a day modal. |
 | [`MMM-OnSpotify`](https://github.com/Fabrizz/MMM-OnSpotify) | Playback state, cover art and device info from the Spotify Web API. Read-only scopes. |
 | [`MMM-LiveLyrics`](https://github.com/Fabrizz/MMM-LiveLyrics) | Time-synced lyrics for the current track. |
