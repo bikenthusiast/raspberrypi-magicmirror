@@ -95,7 +95,7 @@ input.
 In the log:
 
 ```bash
-grep -i "onspotify" ~/Projects/MagicMirror/logs/mm_*.log \
+journalctl -t magicmirror -b | grep -i "onspotify" \
   | grep -iE "token|refresh|CODE|error"
 ```
 

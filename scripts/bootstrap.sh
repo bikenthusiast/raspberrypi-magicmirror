@@ -28,9 +28,8 @@ RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'; GREEN=$'\033[0;32m'; NC=$'\033[0m'
 
 mkdir -p "$MODULES_DIR"
 
-# systemd does not create the parent directory for StandardOutput=append:,
-# and the user service then fails with status=209/STDOUT -- a code that
-# says nothing about the cause.
+# Log directory for scripts/run-server.sh (manual runs in server mode).
+# The systemd service itself logs to the journal.
 mkdir -p "$MM_ROOT/logs"
 
 # --- 1. Clone or update the third-party modules ----------------------

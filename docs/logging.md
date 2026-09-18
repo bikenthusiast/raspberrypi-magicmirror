@@ -17,8 +17,8 @@ journalctl -t magicmirror --since "10 min ago"
 ```
 
 `journalctl --user -u magicmirror` returns **"No journal files were found"** even though the
-entries exist. Use the `-t magicmirror` identifier instead — that is what the drop-in below
-sets it up for.
+entries exist. Use the `-t magicmirror` identifier instead — that is what `SyslogIdentifier` in the unit
+sets up.
 
 Remote, from a workstation:
 
@@ -32,30 +32,8 @@ ssh -t raspberrypi-magicmirror "journalctl -t magicmirror -f -n 50"
 
 ### 1. Service unit
 
-`~/.config/systemd/user/magicmirror.service` (unchanged, package/own original):
-
-```ini
-[Unit]
-Description=MagicMirror (Electron)
-After=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-WorkingDirectory=/home/tobiask/Projects/MagicMirror
-ExecStart=/usr/bin/npm start
-Restart=on-failure
-RestartSec=15
-StandardOutput=append:/home/tobiask/Projects/MagicMirror/logs/magicmirror.log
-StandardError=append:/home/tobiask/Projects/MagicMirror/logs/magicmirror.log
-
-[Install]
-WantedBy=default.target
-```
-
-### 2. Service drop-in — send output to the journal
-
-`~/.config/systemd/user/magicmirror.service.d/override.conf`:
+[`systemd/magicmirror-user.service`](../systemd/magicmirror-user.service), installed as
+`~/.config/systemd/user/magicmirror.service`, sends its output to the journal directly:
 
 ```ini
 [Service]
@@ -64,18 +42,15 @@ StandardError=journal
 SyslogIdentifier=magicmirror
 ```
 
-Created with:
+### 2. Older installs: service drop-in
+
+Before the unit was changed, it wrote to `logs/magicmirror.log` via `StandardOutput=append:`,
+and the journal was switched on with a drop-in at
+`~/.config/systemd/user/magicmirror.service.d/override.conf` containing the three lines above.
+With the current unit the drop-in is redundant and can be removed:
 
 ```bash
-mkdir -p ~/.config/systemd/user/magicmirror.service.d
-
-cat > ~/.config/systemd/user/magicmirror.service.d/override.conf << 'EOF'
-[Service]
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=magicmirror
-EOF
-
+rm ~/.config/systemd/user/magicmirror.service.d/override.conf
 systemctl --user daemon-reload
 systemctl --user restart magicmirror
 ```
@@ -135,7 +110,7 @@ bounds it.
 ## Verification
 
 ```bash
-# Is the service drop-in in effect?
+# Does the service log to the journal?
 systemctl --user show magicmirror -p StandardOutput -p StandardError
 # expected: StandardOutput=journal / StandardError=journal
 
@@ -172,10 +147,6 @@ impossible.
 ## Reverting
 
 ```bash
-# Back to file logging
-rm ~/.config/systemd/user/magicmirror.service.d/override.conf
-systemctl --user daemon-reload && systemctl --user restart magicmirror
-
 # Back to the Raspberry Pi OS default (volatile journal)
 sudo rm /etc/systemd/journald.conf.d/99-persistent.conf
 sudo systemctl restart systemd-journald

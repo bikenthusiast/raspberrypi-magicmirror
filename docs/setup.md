@@ -578,8 +578,7 @@ fixed there, the patch section in `bootstrap.sh` can go.
 
 ```bash
 cd ~/Projects/raspberrypi-magicmirror
-cp config/config.js.example config/config.js   # if not yet tracked directly
-nano config/config.js
+nano config/config.js   # tracked in Git; contains no credentials
 ```
 
 `config.js` reads the credentials rather than containing them, and uses
@@ -622,7 +621,7 @@ API rejects it.
 
 Directly after the require, before `let config = {`, sits a block that reports
 missing, empty, wrongly sized or misspelled keys. Output goes to `stderr` and
-therefore into `magicmirror.log`.
+therefore into the journal.
 
 It does not abort — a mirror that refuses to start over a missing Genius token
 would be worse than one without lyrics.
@@ -630,7 +629,7 @@ would be worse than one without lyrics.
 After any change to `secrets.js`:
 
 ```bash
-grep -A 12 "secrets.js" ~/Projects/MagicMirror/logs/magicmirror.log | tail -15
+journalctl -t magicmirror -b | grep -A 12 "secrets.js" | tail -15
 ```
 
 ### Symlinks
@@ -688,7 +687,6 @@ Three pieces: rotation, autostart, user service.
 
 ```bash
 mkdir -p ~/.config/kanshi ~/.config/labwc ~/.config/systemd/user
-mkdir -p ~/Projects/MagicMirror/logs
 
 cp config/desktop/kanshi.conf    ~/.config/kanshi/config
 cp config/desktop/labwc-autostart ~/.config/labwc/autostart
@@ -696,7 +694,7 @@ cp systemd/magicmirror-user.service ~/.config/systemd/user/magicmirror.service
 
 systemctl --user daemon-reload
 systemctl --user enable --now magicmirror
-sudo loginctl enable-linger tobiask
+sudo loginctl enable-linger "$USER"
 ```
 
 > [!NOTE]
@@ -706,11 +704,6 @@ sudo loginctl enable-linger tobiask
 >
 > The profile matches on make, model and serial rather than the connector name,
 > so it survives a change in port enumeration.
-
-> [!IMPORTANT]
-> **`logs/` must exist before the service starts.** systemd does not create the
-> parent directory for `StandardOutput=append:`, and the service fails with
-> `status=209/STDOUT` — a code that says nothing about the cause.
 
 > [!IMPORTANT]
 > `enable-linger` is essential. Without it user services only run while an
@@ -907,7 +900,7 @@ cec-ctl -d /dev/cec1 --to 0 --image-view-on
 | Guest WiFi | `SHOW_HIDDEN_PAGE/gast` displays the QR code, scans |
 | Presence | panel goes dark after the grace period, wakes on approach |
 | Schedule | powers down at 22:15, comes back at 07:30 |
-| Logs | `~/Projects/MagicMirror/logs/magicmirror.log` grows across reboots |
+| Logs | `journalctl --list-boots` shows more than one boot; `journalctl -t magicmirror -b` has entries |
 | Temperature | around 61 °C steady, `vcgencmd get_throttled` returns `0x0` |
 
 ### Guest page over HTTP
@@ -929,19 +922,33 @@ curl -H "Authorization: apiKey $KEY" \
 
 ## 17 · Logging
 
-MagicMirror writes to a file via journal:
+The service unit sends stdout and stderr to the journal under the identifier
+`magicmirror`:
 
 ```bash
 journalctl -t magicmirror -b            # this boot only  ← use this by default
 journalctl -t magicmirror -f -n 50      # follow live, with context
 journalctl -t magicmirror -p err -b     # errors only
-'''
+```
+
+Raspberry Pi OS keeps the journal in RAM by default, so it is lost on every
+reboot — including the nightly Witty Pi shutdown. Make it persistent:
+
+```bash
+sudo mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=100M\nSystemMaxFileSize=20M\n' \
+  | sudo tee /etc/systemd/journald.conf.d/99-persistent.conf
+sudo systemctl restart systemd-journald
+sudo journalctl --flush
+```
+
+The file name must sort after the image's `40-rpi-volatile-storage.conf`.
+`SystemMaxUse` caps the size, so no logrotate is needed. Background and
+troubleshooting: [`logging.md`](logging.md).
 
 > [!CAUTION]
 > The log contains API tokens in URLs — the Genius token appears in full in
-> every lyrics request. `logs/` must be gitignored.
-
-<!-- TODO: logrotate -->
+> every lyrics request. Check before sharing any log excerpt.
 
 ---
 
@@ -956,8 +963,3 @@ journalctl -t magicmirror -p err -b     # errors only
 
 - [ ] Commit pins in `modules.txt` — without them a rebuild in six months
       gets different code
-- [ ] logrotate for `magicmirror.log` (section 17)
-- [ ] `config.js.example` and `sync-config.sh` removed once `config.js` is
-      tracked directly
-- [ ] `mkdir -p "$MM_ROOT/logs"` into `bootstrap.sh`, and `node --check` on
-      both patched files after the rewrite
