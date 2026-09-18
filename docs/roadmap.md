@@ -1,448 +1,494 @@
 # Roadmap
 
-Ausbaustufen des Spiegels nach Abschluss der Softwarebasis. Stand: KW 35 / 2026.
+Extension phases for the mirror after the software base is complete. Status as of CW 38 / 2026.
 
-**Planungsgrundlage:** 4 h/Tag an 5 Tagen, also rund 20 h pro Woche. Bei sieben
-Arbeitstagen komprimiert sich der Plan um etwa ein Drittel.
+**Planning basis:** 4 h/day, 5 days a week, so roughly 20 h per week. With seven
+working days, the plan compresses by about a third.
 
-| Phase | KW | Aufwand | Ergebnis |
-|---|---|---|---|
-| [1 · Hidden Page](#phase-1--hidden-page-auf-zuruf) | 35 | ~6 h | Gast-QR-Code auf Abruf |
-| [2 · Zeitplan](#phase-2--display-nach-zeitplan) | 36 | ~10 h | Display nachts aus |
-| [3 · Anwesenheit](#phase-3--anwesenheitserkennung) | 37–38 | ~25 h | Radar schaltet das Display |
-| [4 · Abschaltung](#phase-4--harte-abschaltung) | 39 | ~14 h | Pi fährt herunter und wacht auf |
-| [5 · Gesten](#phase-5--gestensteuerung) | 40–42 | ~45 h | Module per Handzeichen schalten |
+| Phase | CW | Effort | Result | Status |
+|---|---|---|---|---|
+| [1 · Hidden page](#phase-1--hidden-page-on-demand) | 35 | ~6 h | Guest Wi-Fi QR code on demand | ✅ Done |
+| [2 · Display schedule](#phase-2--display-schedule) | 36 | ~10 h | Display off at night | ↪ Superseded — see ADR-002 / ADR-005 |
+| [3 · Presence detection](#phase-3--presence-detection) | 37–38 | ~25 h | Radar switches the display | ✅ Done |
+| [4 · Hard shutdown](#phase-4--hard-shutdown) | 39 | ~14 h | Pi shuts down and wakes up | ✅ Done (ahead of plan) |
+| [5 · Gestures](#phase-5--gesture-control) | 40–42 | ~45 h | Modules switched by hand gesture | ⏳ Next |
 
 ```mermaid
 gantt
-    title Ausbaustufen KW 35 bis 42
+    title Extension phases CW 35 to 42
     dateFormat YYYY-MM-DD
-    axisFormat KW %V
+    axisFormat CW %V
 
-    section Vorlauf
-    Hardware bestellen        :done, best, 2026-08-24, 7d
+    section Lead time
+    Order hardware                  :done, best, 2026-08-24, 7d
 
     section Software
-    1 Hidden Page             :p1, 2026-08-24, 7d
-    2 Zeitplan Display        :p2, after p1, 7d
+    1 Hidden page                    :done, p1, 2026-08-24, 7d
+    2 Display schedule (superseded)  :done, p2, after p1, 7d
 
     section Hardware
-    3 Anwesenheitserkennung   :p3, after p2, 14d
-    4 Harte Abschaltung       :p4, after p3, 7d
+    3 Presence detection             :done, p3, after p2, 14d
+    4 Hard shutdown                  :done, p4, after p3, 7d
 
-    section Ausbau
-    5 Gestensteuerung         :p5, after p4, 21d
+    section Extension
+    5 Gesture control                :p5, after p4, 21d
 ```
 
 ---
 
-## Reihenfolge und ihre Begründung
+## What changed against the plan
 
-Die Phasen bauen aufeinander auf, und zwar nicht nur zeitlich.
-
-**Die Hidden Page steht zuerst**, weil sie das Ziel aller späteren Phasen ist.
-Radar und Geste lösen am Ende dasselbe aus: einen Aufruf, der eine Seite ein-
-oder ausblendet. Steht dieser Mechanismus und ist er getestet, reduzieren sich
-die späteren Phasen auf die Frage, wer den Auslöser drückt. Umgekehrt gebaut
-debuggt man Sensor und Schaltmechanik gleichzeitig.
-
-**Der Zeitplan folgt**, weil er ohne Hardware auskommt und sofort Nutzen bringt.
-Dabei entsteht der Baustein, den Phase 3 wiederverwendet: das Ein- und
-Ausschalten des Displays. Das Radar ersetzt später nur den Auslöser, nicht die
-Mechanik.
-
-**Anwesenheitserkennung als erste Hardware**, weil sie die einfachere von
-beiden ist und eine Architekturentscheidung erzwingt (Sensor am GPIO oder eigener
-Knoten), die auch Phase 5 betrifft.
-
-**Die harte Abschaltung danach**, weil sie mit der Anwesenheitserkennung in
-Konkurrenz steht: Ein ausgeschalteter Pi kann niemanden erkennen. Erst wenn
-Phase 3 läuft, weißt du, ob du sie überhaupt willst und für welche Zeitfenster.
-
-**Gesten zuletzt**, weil sie alles darunter voraussetzen und technisch am
-anspruchsvollsten sind.
-
-**Repository und Dokumentation wachsen in jeder Phase mit**, nicht am Ende.
-Nachträglich dokumentieren scheitert daran, dass die Begründungen vergessen sind.
+- **Phase 2 wasn't built as planned.** The plan was to switch the HDMI output
+  through the compositor (`wlr-randr` / `wlopm`) on systemd timers. Under
+  labwc, turning the output off makes the compositor spin up a headless
+  replacement output, and re-enabling the real one failed roughly half the
+  time ("failed to apply configuration"), leaking a headless output on every
+  cycle.
+- **Display power moved to HDMI-CEC instead** — it puts the monitor into
+  standby while the Pi's own output stays enabled. See
+  [ADR-002](adr/002-display-power-cec.md). The time-based part moved into the
+  Witty Pi's own schedule (on at 07:30, off at 22:15) — see
+  [ADR-005](adr/005-power-management.md). No display timers exist in this
+  repo.
+- **Phase 3 used wiring variant A** — the sensor's OUT pin goes directly to
+  GPIO 27, with no UART in operation. See
+  [ADR-004](adr/004-sensor-connection.md). There is no ESP32 node.
+- **Phase 4 finished in CW 37**, a week ahead of the original CW 39 plan.
+- **The ADRs planned for each phase were written retrospectively, in CW 38**
+  (`docs/adr/`).
 
 ---
 
-## Phase 1 · Hidden Page auf Zuruf
+## Order and rationale
 
-**KW 35 · ~6 h · keine Hardware**
+The phases build on each other, and not just in terms of timing.
 
-Der Gast-WLAN-QR-Code liegt bereits auf einer versteckten Seite von MMM-pages und
-ist nicht Teil der Rotation. Diese Phase macht ihn aufrufbar und schafft damit
-den Auslösemechanismus, den alle folgenden Phasen benutzen.
+**The hidden page comes first**, because it is the target of every later
+phase. Radar and gestures ultimately trigger the same thing: a call that
+shows or hides a page. Once that mechanism is in place and tested, the later
+phases reduce to the question of who presses the trigger. Built the other
+way round, you'd be debugging the sensor and the switching mechanism at the
+same time.
 
-### Aufgaben
+**The schedule comes next**, because it needs no hardware and pays off
+immediately. It also produces the building block Phase 3 reuses: switching
+the display on and off. The radar later only replaces the trigger, not the
+mechanism.
 
-- Aufruf der versteckten Seite per HTTP über MMM-Remote-Control verifizieren
-- Automatisches Zurückschalten nach einer Zeitspanne
-- Shell-Skript als bequemer Einstiegspunkt
-- ADR: warum Notification statt direktem `hide()`/`show()`
+**Presence detection comes first among the hardware phases**, because it's
+the simpler of the two and forces an architecture decision (sensor on GPIO
+or its own node) that also affects Phase 5.
 
-### Artefakte
+**Hard shutdown comes after that**, because it competes with presence
+detection: a powered-off Pi can't detect anyone. Only once Phase 3 is
+running do you know whether you actually want it, and for which time
+windows.
 
-| Artefakt | Ort |
+**Gestures come last**, because they depend on everything below them and
+are technically the most demanding.
+
+**The repository and documentation grow with every phase**, not at the end.
+Documenting afterward fails because the reasoning has been forgotten by
+then.
+
+---
+
+## Phase 1 · Hidden page on demand
+
+**CW 35 · ~6 h · no hardware**
+**Status:** done in CW 36
+
+The guest Wi-Fi QR code already lives on a hidden page of MMM-pages and
+isn't part of the rotation. This phase makes it callable and, in doing so,
+creates the trigger mechanism every later phase uses.
+
+### Tasks
+
+- Verify calling the hidden page over HTTP through MMM-Remote-Control
+- Automatic switch-back after a timeout
+- Shell script as a convenient entry point
+- ADR: why a notification instead of calling `hide()`/`show()` directly
+
+### Artifacts
+
+| Artifact | Location |
 |---|---|
-| `guest-wifi.sh` | `scripts/` |
-| ADR Auslösemechanismus | `docs/adr/003-hidden-page-trigger.md` |
-| Abschnitt in der Modul-Doku | `docs/mmm-spotifypages.md` |
+| `guest-page.sh` | `scripts/` (done) |
+| ADR: hidden page trigger mechanism | [`adr/001-hidden-page-trigger.md`](adr/001-hidden-page-trigger.md) |
+| Section in the module docs | `docs/mmm-spotifypages.md` |
 
-### Abschlusskriterium
+### Completion criterion
 
-Ein Befehl blendet den QR-Code ein, ein zweiter blendet ihn aus, und nach einer
-konfigurierten Zeit passiert das von selbst.
-
----
-
-## Phase 2 · Display nach Zeitplan
-
-**KW 36 · ~10 h · keine Hardware**
-
-Nachts einen leuchtenden Spiegel im Flur zu haben ist unnötig. Diese Phase
-schaltet den HDMI-Ausgang zeitgesteuert ab. Der Pi läuft weiter — Module bleiben
-aktiv, Daten aktuell, kein Bootvorgang beim Einschalten.
-
-Zu klären ist der Weg zur Displaysteuerung unter Wayland/labwc auf Trixie:
-`wlr-randr --output HDMI-A-1 --off` ist der naheliegende Kandidat, muss aber
-gegen den laufenden Compositor getestet werden. Für den Server-Modus ohne
-grafische Session gelten andere Voraussetzungen als für den späteren
-Electron-Betrieb.
-
-### Aufgaben
-
-- Displaysteuerung auf der Zielumgebung verifizieren
-- Skript für an/aus mit Statusabfrage
-- systemd-Timer für Ein- und Ausschaltzeit
-- Manueller Übersteuerungsweg, falls der Timer stört
-
-### Artefakte
-
-| Artefakt | Ort |
-|---|---|
-| `display-power.sh` | `scripts/` |
-| `display-on.timer`, `display-off.timer` | `systemd/` |
-| ADR Displaysteuerung unter Wayland | `docs/adr/004-display-power.md` |
-
-### Abschlusskriterium
-
-Das Display schaltet zur eingestellten Zeit ab und wieder ein, überlebt einen
-Neustart des Pi, und der Spiegel zeigt beim Einschalten sofort Inhalt.
+One command shows the QR code, a second hides it, and after a configured
+time it happens automatically.
 
 ---
 
-## Phase 3 · Anwesenheitserkennung
+## Phase 2 · Display schedule
 
-**KW 37–38 · ~25 h · Hardware erforderlich**
+**CW 36 · ~10 h · no hardware**
+**Status:** superseded
 
-Das Display schaltet ein, wenn jemand vor dem Spiegel steht, und nach einer
-Nachlaufzeit wieder ab. Der Zeitplan aus Phase 2 bleibt als Rahmen bestehen:
-nachts bleibt es dunkel, auch wenn jemand vorbeigeht.
+> [!NOTE]
+> Superseded — see ["What changed against the plan"](#what-changed-against-the-plan)
+> above. Display power now runs over HDMI-CEC (ADR-002), and the schedule
+> lives in the Witty Pi (ADR-005). No `display-power.sh` script or systemd
+> timers were ever built.
 
-### Technologiewahl
+Having a mirror glowing in the hallway at night serves no purpose. This
+phase was meant to switch off the HDMI output on a schedule, while the Pi
+kept running — modules stay active, data stays current, and there's no boot
+process at power-on.
 
-| Technologie | Eignung | Bewertung |
+The open question was how to control the display under Wayland/labwc on
+Trixie: `wlr-randr --output HDMI-A-1 --off` was the obvious candidate, but
+it had to be tested against the running compositor. Server mode without a
+graphical session has different preconditions than the later Electron
+setup.
+
+### Tasks (as originally planned)
+
+- Verify display control on the target environment
+- Script for on/off with status query
+- systemd timers for the on and off times
+- A manual override path in case the timer gets in the way
+
+### Artifacts
+
+Superseded before implementation — `display-power.sh` and the
+`display-on.timer`/`display-off.timer` systemd units were never created.
+See [ADR: display control under Wayland](adr/002-display-power-cec.md) and
+[ADR: power management](adr/005-power-management.md).
+
+### Completion criterion (not reached — superseded)
+
+The display was meant to switch off at a set time and back on again,
+survive a Pi reboot, and show content immediately at power-on.
+
+---
+
+## Phase 3 · Presence detection
+
+**CW 37–38 · ~25 h · hardware required**
+**Status:** done in CW 37
+
+The display switches on when someone stands in front of the mirror, and off
+again after a hold time. The schedule from Phase 2 still acts as a frame:
+it stays dark at night even if someone walks past.
+
+### Technology choice
+
+| Technology | Suitability | Assessment |
 |---|---|---|
-| **mmWave-Radar 24 GHz** (HMMD / S3KM1110) | erkennt auch reglose Anwesenheit, Empfindlichkeit pro Zone | **gewählt** |
-| PIR (HC-SR501) | reagiert nur auf Bewegung | ungeeignet — wer still vor dem Spiegel steht, verschwindet |
-| Ultraschall (HC-SR04) | Abstandsmessung, kein Personenbezug | ungeeignet, störanfällig |
-| Kamera + Personenerkennung | funktioniert, aber CPU-hungrig | Overkill für an/aus, kommt in Phase 5 ohnehin |
-| BLE-Präsenz (Handy) | erkennt Geräte, nicht Personen | falsche Semantik für einen Spiegel |
+| **mmWave radar 24 GHz** (HMMD / S3KM1110) | detects presence even without motion, per-zone sensitivity | **selected** |
+| PIR (HC-SR501) | reacts only to motion | unsuitable — anyone standing still in front of the mirror disappears |
+| Ultrasonic (HC-SR04) | distance measurement, no person-specific signal | unsuitable, prone to interference |
+| Camera + person detection | works, but CPU-hungry | overkill for on/off, comes in Phase 5 anyway |
+| BLE presence (phone) | detects devices, not people | wrong semantics for a mirror |
 
-Der entscheidende Punkt gegen PIR: Ein Mensch, der sich rasiert oder die Zähne
-putzt, bewegt sich für einen PIR-Sensor zu wenig. Das Display ginge mitten im
-Gebrauch aus. mmWave misst dagegen Reflexionen und erkennt selbst Atembewegung.
+The deciding point against PIR: someone shaving or brushing their teeth
+moves too little for a PIR sensor. The display would turn off mid-use.
+mmWave, by contrast, measures reflections and picks up even breathing
+motion.
 
-### Verkabelung
+### Wiring
 
-Der Pi steht extern unter dem Spiegel, der Sensor sitzt am Spiegel. Dazwischen
-liegt mindestens ein Meter — daraus folgt eine Architekturentscheidung:
+The Pi sits externally under the mirror; the sensor sits on the mirror.
+There's at least a meter between them — which forces an architecture
+decision:
 
-| Variante | Aufwand | Bewertung |
+| Variant | Effort | Assessment |
 |---|---|---|
-| **A** Sensor direkt am GPIO, nur `OUT` | gering | ausreichend für an/aus, geschirmtes Kabel verwenden |
-| **B** Sensor direkt am GPIO, UART | gering | über 1 m ungeschirmt wackelig bei 256000 Baud |
-| **C** ESP32 am Spiegel, Meldung per WLAN | +1 Abend, +6 € | sauber, zweiter Sensorknoten, passt zur verteilten Architektur |
+| **A** Sensor directly on GPIO, `OUT` only | low | sufficient for on/off, use shielded cable |
+| **B** Sensor directly on GPIO, UART | low | unreliable over 1 m unshielded at 256,000 baud |
+| **C** ESP32 on the mirror, reporting over Wi-Fi | +1 evening, +€6 | clean, a second sensor node, fits the distributed architecture |
 
-Variante A ist der schnelle Weg zum Ergebnis, C die bessere Grundlage für den
-Ausbau. Die Entscheidung gehört in ein ADR, nicht nebenbei getroffen.
+Variant A is the fast path to a result, C the better foundation for future
+expansion. The decision belongs in an ADR, not made in passing. Variant A
+is the one that was actually built — see
+[ADR-004](adr/004-sensor-connection.md).
 
-### Gewählter Sensor
+### Chosen sensor
 
-**Waveshare HMMD mmWave Sensor** (S3KM1110), 24 GHz FMCW, bezogen über BerryBase.
+**Waveshare HMMD mmWave sensor** (S3KM1110), 24 GHz FMCW, sourced from
+BerryBase.
 
-Gegenüber dem verbreiteten LD2410C bietet er zwei Vorteile, die für einen
-Spiegel zählen: Die Empfindlichkeit lässt sich pro Entfernungsbereich einzeln
-konfigurieren — der Nahbereich vor dem Spiegel kann empfindlich stehen, während
-weiter entfernte Zonen gedämpft werden, damit nicht jeder Durchgang im Flur
-auslöst. Und Waveshare liefert Beispielcode für den Raspberry Pi mit.
+Compared to the popular LD2410C, it offers two advantages that matter for a
+mirror: sensitivity can be configured separately per distance zone — the
+near zone in front of the mirror can be set sensitive, while more distant
+zones are damped so that every pass through the hallway doesn't trigger it.
+And Waveshare ships example code for the Raspberry Pi.
 
-Reichweite bis 8,5 m für bewegte Personen, über UART begrenzbar. Modulgröße
+Range up to 8.5 m for moving people, limitable over UART. Module size
 20 × 20 mm.
 
-### Pinbelegung am Raspberry Pi
+### Pin assignment on the Raspberry Pi
 
-> **Achtung: 3,3 V, nicht 5 V.** Der HMMD arbeitet vollständig mit 3,3 V.
-> Versorgung über Pin 2 (5 V) zerstört das Modul.
+> **Warning: 3.3 V, not 5 V.** The HMMD runs entirely on 3.3 V. Powering it
+> from pin 2 (5 V) destroys the module.
 
-| Sensor | Pi-Pin | GPIO | Funktion |
+| Sensor | Pi pin | GPIO | Function |
 |---|---|---|---|
-| VCC | 1 oder 17 | — | **3,3 V** |
-| GND | 6, 9 oder 14 | — | Masse |
-| TX | 10 | GPIO 15 (RXD) | Sensordaten zum Pi |
-| RX | — | ~~GPIO 14 (TXD)~~ | **nicht verbinden**, siehe unten |
-| OUT | 13 | GPIO 27 | Digital, Präsenz high/low |
+| VCC | 17 | — | **3.3 V** |
+| GND | 9 | — | Ground |
+| TX | 10 | GPIO 15 (RXD) | not connected in operation — sensor data to the Pi |
+| RX | — | ~~GPIO 14 (TXD)~~ | **do not connect**, see below |
+| OUT (OT2) | 13 | GPIO 27 | Digital, presence high/low |
 
-Da beide Seiten mit 3,3-V-Logik arbeiten, ist kein Pegelwandler nötig.
+Since both sides run 3.3 V logic, no level shifter is needed.
 
-### Warum TXD unbeschaltet bleibt
+### Why TX/RX stay unconnected in operation
 
-Der Witty Pi aus Phase 4 nutzt GPIO 14 (TXD) nicht selbst, **überwacht aber
-dessen Spannung**: TXD soll HIGH sein, solange das System läuft, und nach dem
-Herunterfahren LOW werden. Daran erkennt das Board, wann es den Strom kappen
-darf. Laut Handbuch dürfen angeschlossene Geräte dieses Verhalten nicht
-verändern — sonst bleibt der Pi dauerhaft unter Spannung.
+The Witty Pi from Phase 4 doesn't use GPIO 14 (TXD) itself, but
+**monitors its voltage**: TXD is expected to be HIGH while the system is
+running and go LOW after shutdown. That's how the board knows when it's
+safe to cut power. Per the manual, connected devices must not interfere
+with this behavior — otherwise the Pi stays powered indefinitely.
 
-Deshalb wird nur die Empfangsrichtung verdrahtet: Der Sensor sendet, der Pi
-hört zu.
+In operation, neither UART line ends up wired at all: the sensor's TX and
+RX lines stay disconnected, and only the digital OUT pin is used.
 
-**Konsequenz:** Der Sensor lässt sich nicht vom Pi aus konfigurieren.
-Empfindlichkeitszonen und Reichweite werden einmalig über einen USB-TTL-Adapter
-am Entwicklungsrechner eingestellt. Das sind Einmaleinstellungen, kein
-laufender Betrieb — der Verlust ist verschmerzbar.
+**Consequence:** the sensor can't be configured from the Pi. Sensitivity
+zones and range are set once, via a USB-TTL adapter (FT232) on the
+development machine. These are one-time settings, not something needed
+during normal operation — so the loss is easy to live with.
 
-### GPIO-Belegung im Überblick
+### GPIO assignment overview
 
-| GPIO | Verwendet von | Zweck |
+| GPIO | Used by | Purpose |
 |---|---|---|
-| 2 (SDA1) | Witty Pi | I²C zum MCU |
-| 3 (SCL1) | Witty Pi | I²C zum MCU |
-| 4 | Witty Pi | Taster / Shutdown-Signal |
-| 14 (TXD) | Witty Pi (nur Überwachung) | erkennt System-Aus |
-| 15 (RXD) | **Radar** | Sensordaten |
-| 17 | Witty Pi | SYS_UP-Signal |
-| 27 | **Radar** | Präsenz digital |
+| 2 (SDA1) | Witty Pi | I²C to the MCU |
+| 3 (SCL1) | Witty Pi | I²C to the MCU |
+| 4 | Witty Pi | button / shutdown signal |
+| 14 (TXD) | Witty Pi (monitoring only) | detects system-off |
+| 15 (RXD) | free | radar UART not used in operation |
+| 17 | Witty Pi | SYS_UP signal |
+| 27 | **Radar** | presence, digital |
 
-Keine Überschneidung. GPIO 27 wurde bewusst statt GPIO 17 gewählt — letzterer
-ist vom Witty Pi belegt.
+No overlap. GPIO 27 was deliberately chosen over GPIO 17 — the latter is
+used by the Witty Pi.
 
-### Vorbedingungen in raspi-config
+### Preconditions in raspi-config
 
-Diese drei Einstellungen müssen vor der Montage stimmen, sonst startet der Pi
-mit aufgestecktem Witty Pi nicht zuverlässig:
+These three settings must be correct before mounting, or the Pi won't
+start up reliably with the Witty Pi attached:
 
-| Einstellung | Wert | Begründung |
+| Setting | Value | Reason |
 |---|---|---|
-| **1-Wire** | **deaktiviert** | belegt standardmäßig GPIO 4 — bei aktivem 1-Wire fährt der Pi nach jedem Boot sofort wieder herunter, ohne dass ein Login möglich ist |
-| **Serieller Port, Hardware** | **aktiviert** | ohne definierten Ruhezustand auf TXD kappt Witty Pi den Strom versehentlich |
-| **Serieller Port, Login-Shell** | **deaktiviert** | sonst belegt die Konsole die Leitung, die der Sensor nutzt |
-| **I²C** | **aktiviert** | Kommunikation mit dem Witty Pi |
+| **1-Wire** | **disabled** | occupies GPIO 4 by default — with 1-Wire active, the Pi shuts back down right after every boot, with no chance to log in |
+| **Serial port, hardware** | **enabled** | without a defined idle state on TXD, the Witty Pi cuts power by mistake |
+| **Serial port, login shell** | **disabled** | otherwise the console occupies the line the sensor uses |
+| **I²C** | **enabled** | communication with the Witty Pi |
 
-Für einen stabilen UART auf GPIO 14/15 zusätzlich in `/boot/firmware/config.txt`:
+For a stable UART on GPIO 14/15, additionally add this to
+`/boot/firmware/config.txt`:
 
 ```
 dtoverlay=disable-bt
 enable_uart=1
 ```
 
-Damit liegt der PL011-UART statt des taktabhängigen Mini-UART auf diesen Pins.
-Preis: kein Bluetooth mehr — für den Spiegel unerheblich.
+This puts the PL011 UART, instead of the clock-dependent mini-UART, on
+these pins. The cost: no more Bluetooth — irrelevant for the mirror.
 
-### Einbau
+### Installation
 
-Spionglas ist metallbedampft und dämpft Funkwellen, das LCD-Chassis sperrt
-vollständig. Der Sensor muss deshalb außerhalb der Panelfläche und außerhalb der
-bedampften Glasfläche sitzen — praktikabel ist eine Tasche in der unteren
-Rahmenleiste mit ein bis zwei Millimeter Restholz. Holz und MDF sind für mmWave
-weitgehend transparent.
+Two-way mirror glass is metal-coated and dampens radio waves; the LCD
+chassis blocks them completely. The sensor therefore has to sit outside
+the panel area and outside the coated glass area — a pocket in the bottom
+frame rail with one to two millimeters of remaining wood is practical.
+Wood and MDF are largely transparent to mmWave.
 
-### Artefakte
+### Artifacts
 
-| Artefakt | Ort |
+| Artifact | Location |
 |---|---|
-| `presence.py` oder ESP32-Firmware | `scripts/` bzw. `firmware/` |
-| Pinbelegung und Schaltplan | `docs/hardware.md` |
-| ADR Sensorwahl | `docs/adr/005-praesenzsensor.md` |
-| ADR Anbindung (GPIO oder ESP32) | `docs/adr/006-sensoranbindung.md` |
-| systemd-Unit für den Sensordienst | `systemd/` |
+| `presence.py` | `scripts/` |
+| `presence.service` | `systemd/` |
+| Pin assignment and wiring diagram | `docs/hardware.md` |
+| ADR: presence sensor choice | [`adr/003-presence-sensor.md`](adr/003-presence-sensor.md) |
+| ADR: sensor connection (GPIO or ESP32) | [`adr/004-sensor-connection.md`](adr/004-sensor-connection.md) |
 
-### Abschlusskriterium
+### Completion criterion
 
-Der Spiegel geht an, wenn jemand den Raum betritt, bleibt an, solange jemand
-davorsteht — auch reglos —, und geht nach der Nachlaufzeit aus. Innerhalb der
-Nachtzeiten aus Phase 2 bleibt er dunkel.
+The mirror turns on when someone enters the room, stays on while someone
+is standing in front of it — even motionless — and turns off after the
+hold time. It stays dark during the night hours from Phase 2.
 
 ---
 
-## Phase 4 · Harte Abschaltung
+## Phase 4 · Hard shutdown
 
-**KW 39 · ~14 h · Hardware erforderlich**
+**CW 39 · ~14 h · hardware required**
+**Status:** done in CW 37
 
-Bis hierher läuft der Pi durch. Diese Phase fährt ihn zu definierten Zeiten
-wirklich herunter und weckt ihn wieder.
+Up to this point, the Pi keeps running continuously. This phase actually
+shuts it down at defined times and wakes it back up.
 
-### Warum dafür Hardware nötig ist
+### Why hardware is needed for this
 
-Ein heruntergefahrener Raspberry Pi kann sich nicht selbst einschalten. Ihm
-fehlen eine batteriegepufferte Uhr und eine Schaltung, die die Stromversorgung
-zum richtigen Zeitpunkt wieder herstellt. Der Pi 5 bringt Ansätze davon mit, der
-Pi 4B nicht.
+A powered-off Raspberry Pi can't switch itself back on. It lacks a
+battery-backed clock and a circuit that restores power at the right time.
+The Pi 5 has some of this built in; the Pi 4B doesn't.
 
-Die etablierte Lösung ist ein Power-Management-HAT mit RTC. Er sitzt auf dem
-GPIO-Header, trennt den Pi bei Bedarf vollständig vom Strom und fährt ihn nach
-Zeitplan wieder hoch.
+The established solution is a power-management HAT with an RTC. It sits on
+the GPIO header, disconnects the Pi from power entirely when needed, and
+powers it back up on a schedule.
 
-**Gewählt: Witty Pi 4 Mini** (UUGear). RTC mit ±2 ppm Genauigkeit, Superkondensator
-für rund 17 Stunden Gangreserve ohne Strom, e-Latching-Taster für sauberes
-Herunterfahren. Die volle Variante Witty Pi 4 unterscheidet sich nur durch einen
-DC/DC-Wandler für Eingangsspannungen bis 30 V und eine Knopfzelle statt des
-Kondensators — beides wird bei Versorgung aus einem festen 5-V-Netzteil nicht
-gebraucht.
+**Chosen: Witty Pi 4 Mini** (UUGear). RTC with ±2 ppm accuracy, a
+supercapacitor good for roughly 17 hours of backup time without power, and
+an e-latching button for a clean shutdown. The full Witty Pi 4 differs only
+by a DC/DC converter for input voltages up to 30 V and a coin cell instead
+of the capacitor — neither is needed when powering from a fixed 5 V supply.
 
-Ein 2×20-Stacking-Header ist **nicht im Lieferumfang** und zwingend nötig: Ohne
-ihn sitzt das Board flach auf dem GPIO-Header und blockiert die Pins für den
-Radarsensor. Ebenso längere Abstandshülsen und Schrauben — beigelegt sind nur
-4-mm-Spacer und M2.5×10-Schrauben, die mit Stacking-Header nicht mehr reichen.
+A 2×20 stacking header is **not included** and absolutely necessary:
+without it, the board sits flush on the GPIO header and blocks the pins
+needed for the radar sensor. The same goes for longer standoffs and
+screws — only 4 mm spacers and M2.5×10 screws are included, which are too
+short once a stacking header is added.
 
-### Einstellungen, die nicht auf Standard bleiben dürfen
+### Settings that must not be left at default
 
-| Einstellung | Standard | Für den Spiegel | Warum |
+| Setting | Default | For the mirror | Why |
 |---|---|---|---|
-| Default state when powered | OFF | **ON** | sonst bleibt der Spiegel nach einem Stromausfall dunkel, bis jemand den Taster drückt |
+| Default state when powered | OFF | **ON** | otherwise the mirror stays dark after a power outage until someone presses the button |
 
-Die Einstellung findet sich in `wittyPi.sh` unter Punkt 11
-(*View/change other settings*).
+This setting is in `wittyPi.sh` under item 11 (*View/change other
+settings*).
 
-### Verkabelung
+### Wiring
 
-Das Netzteil geht künftig in den **USB-C-Anschluss des Witty Pi**, nicht mehr in
-den Pi. Nur so kann das Board die Stromzufuhr kappen. Die Ausgangsleistung ist
-mit bis zu 2,5 A angegeben — das ist die Grenze, nicht die 3 A des Netzteils.
-Für Pi 4B plus Webcam reicht es.
+The power supply now goes into the **Witty Pi's USB-C port**, not the Pi
+anymore. Only that way can the board cut power. Output is rated at up to
+2.5 A — that's the limiting figure, not the power supply's 3 A. It's
+enough for a Pi 4B plus webcam.
 
-### Spannungsfeld zur Anwesenheitserkennung
+### Tension with presence detection
 
-Ein ausgeschalteter Pi erkennt niemanden. Das Radar kann ihn auch nicht wecken,
-solange es nicht am Trigger-Eingang des HAT hängt. Daraus folgt eine
-Arbeitsteilung:
+A powered-off Pi detects no one. The radar can't wake it either, as long
+as it isn't wired to the HAT's trigger input. That leads to a division of
+labor:
 
-| Zeitfenster | Mechanismus |
+| Time window | Mechanism |
 |---|---|
-| Tagsüber | Pi läuft, Anwesenheitserkennung steuert das Display |
-| Nachts | Pi ist aus, HAT weckt ihn morgens |
-| Längere Abwesenheit | manuell ausgelöste Abschaltung |
+| Daytime | Pi runs, presence detection controls the display |
+| Night | Pi is off, the HAT wakes it in the morning |
+| Extended absence | manually triggered shutdown |
 
-Der Bootvorgang dauert rund 30 Sekunden. Deshalb sollte die Weckzeit vor der
-ersten erwarteten Nutzung liegen, nicht danach.
+Boot takes about 30 seconds. So the wake time should be set before the
+first expected use, not after.
 
-### Zu beachten
+### Things to watch out for
 
-- Belegte Pins: GPIO 2, 3, 4 und 17, dazu Überwachung von GPIO 14 (TXD).
-  Kein Konflikt mit der Radarbelegung aus Phase 3 — siehe dortige Übersicht.
-- Die Software wird gegen Raspberry Pi OS entwickelt und getestet. Trixie ist
-  frisch; die Installation deshalb **sofort nach Lieferung** testen, nicht erst
-  in KW 39:
+- Pins in use: GPIO 2, 3, 4 and 17, plus monitoring of GPIO 14 (TXD). No
+  conflict with the radar's pin assignment from Phase 3 — see the overview
+  there.
+- The software is developed and tested against Raspberry Pi OS. Trixie is
+  new, so test the installation **immediately after delivery**, not in
+  CW 39:
 
   ```bash
   wget https://www.uugear.com/repo/WittyPi4/install.sh
   sudo sh install.sh
   ```
-- Ein Rückweg muss vorhanden bleiben: Wenn der Zeitplan des HAT den Pi zur
-  falschen Zeit abschaltet, braucht es einen Weg, ihn ohne Ausbau wieder
-  hochzubekommen. Die meisten HATs haben dafür einen Taster.
-- Der Pi steht extern, der HAT ist also zugänglich. Das ist ein Argument mehr für
-  den externen Aufbau.
+- There has to be a way back: if the HAT's schedule shuts the Pi down at
+  the wrong time, you need a way to bring it back up without disassembly.
+  Most HATs have a button for that.
+- The Pi sits externally, so the HAT stays accessible. That's one more
+  argument for the external setup.
 
-### Artefakte
+### Artifacts
 
-| Artefakt | Ort |
+| Artifact | Location |
 |---|---|
-| Wochenplan des HAT | `config/` |
-| Pinbelegung ergänzt | `docs/hardware.md` |
-| ADR harte Abschaltung vs. Display-Aus | `docs/adr/007-power-management.md` |
-| Notfallanleitung | `docs/troubleshooting.md` |
+| HAT weekly schedule template | `config/mirror.wpi.example` |
+| Pin assignment (updated) | `docs/hardware.md` |
+| ADR: power management | [`adr/005-power-management.md`](adr/005-power-management.md) |
+| Witty Pi recovery steps | `docs/setup.md`, section 14 |
 
-### Abschlusskriterium
+### Completion criterion
 
-Der Pi fährt abends selbstständig herunter, ist stromlos, und steht morgens vor
-der ersten Nutzung wieder betriebsbereit. Ein Taster holt ihn jederzeit zurück.
+The Pi shuts itself down in the evening, is fully powered off, and is up
+and ready again before the first use in the morning. A button brings it
+back at any time.
 
 ---
 
-## Phase 5 · Gestensteuerung
+## Phase 5 · Gesture control
 
-**KW 40–42 · ~45 h · Kamera erforderlich**
+**CW 40–42 · ~45 h · camera required**
+**Status:** next — starts CW 40
 
-Handzeichen vor dem Spiegel blenden Module ein und aus — der Gast-QR-Code aus
-Phase 1 ist der erste Anwendungsfall.
+Hand signals in front of the mirror show and hide modules — the guest QR
+code from Phase 1 is the first use case.
 
-Diese Phase ist die Brücke zum Schwesterprojekt
-[`pi-edge-ai`](https://github.com/bikenthusiast/pi-edge-ai): Inferenz auf dem
-Gerät, Ergebnis per HTTP an den Spiegel.
+This phase is the bridge to the sister project
+[`pi-edge-ai`](https://github.com/bikenthusiast/pi-edge-ai): inference
+on-device, result sent to the mirror over HTTP.
 
-### Aufgaben
+### Tasks
 
-- Kamera am Spiegel montieren, Kabelweg zum externen Pi klären
-- MediaPipe-Handerkennung unter der uv-verwalteten Python-Umgebung
-- Gestenklassifikation auf zwei bis drei unterscheidbare Zeichen begrenzen
-- Debouncing: eine Geste darf nicht pro Frame feuern, sondern einmal pro Episode
-- Anbindung an MMM-Remote-Control über den Auslöser aus Phase 1
-- Lastmessung: MediaPipe und Electron teilen sich vier Kerne
+- Mount the camera on the mirror, work out the cable run to the external Pi
+- MediaPipe hand detection under the uv-managed Python environment
+- Limit gesture classification to two or three distinguishable signs
+- Debouncing: a gesture must not fire per frame, but once per episode
+- Hook into MMM-Remote-Control via the Phase 1 trigger
+- Load measurement: MediaPipe and Electron share four cores
 
-### Offene Frage zur Rechenleistung
+### Open question on compute
 
-Der Pi 4B hat keine NPU. Ob Inferenz und Vollbild-Rendering gleichzeitig
-laufen, zeigt erst die Messung. Falls nicht, in dieser Reihenfolge prüfen:
+The Pi 4B has no NPU. Whether inference and full-screen rendering can run
+at the same time will only be clear from measurement. If not, check in
+this order:
 
-1. Bildrate und Auflösung senken — kostet nichts
-2. Coral USB Accelerator am vorhandenen Pi — rund 60 €
-3. Pi 5 mit AI HAT+ — deutlich teurer, dafür Reserve für lokale Modelle
+1. Lower frame rate and resolution — costs nothing
+2. Coral USB Accelerator on the existing Pi — about €60
+3. Pi 5 with AI HAT+ — significantly more expensive, but headroom for
+   local models
 
-Erst messen, dann kaufen.
+Measure first, then buy.
 
-### Artefakte
+### Artifacts
 
-| Artefakt | Ort |
+| Artifact | Location |
 |---|---|
-| `gesture.py` mit Debouncer | `scripts/` |
-| Benchmark-Ergebnisse | `docs/benchmarks.md` |
-| ADR Gestenauswahl und Debouncing | `docs/adr/008-gestenerkennung.md` |
-| Kameramontage | `docs/hardware.md` |
+| `gesture.py` with debouncer | `scripts/` |
+| Benchmark results | `docs/benchmarks.md` |
+| ADR: gesture selection and debouncing | `adr/007-gesture-recognition.md` (planned) |
+| Camera mount | `docs/hardware.md` |
 
-### Abschlusskriterium
+### Completion criterion
 
-Eine definierte Geste blendet den Gast-QR-Code ein, eine zweite blendet ihn aus.
-Fehlauslösungen im Alltagsbetrieb sind selten genug, um nicht zu stören, und der
-Spiegel bleibt flüssig.
-
----
-
-## Parallel: Rahmenbau
-
-Der physische Aufbau läuft unabhängig von den Softwarephasen, hat aber lange
-Lieferzeiten bei Spionglas und Panel. Bestellungen gehören deshalb früh
-angestoßen.
-
-Zwei Abhängigkeiten in beide Richtungen:
-
-- Phase 3 legt fest, wo im Rahmen die Sensortasche sitzt — der Rahmen sollte
-  nicht vorher endgültig verschlossen werden
-- Phase 5 legt die Kameraposition fest
-
-Details zum Aufbau in [`hardware.md`](hardware.md).
+One defined gesture shows the guest QR code, a second hides it. False
+triggers during everyday use are rare enough not to be annoying, and the
+mirror stays responsive.
 
 ---
 
-## Risiken
+## In parallel: frame build
 
-| Risiko | Auswirkung | Gegenmaßnahme |
-|---|---|---|
-| Lieferzeiten | blockiert Phase 3 und 4 vollständig | in KW 35 bestellen, vor Bedarf |
-| Displaysteuerung unter Wayland klemmt | Phase 2 verzögert sich | früh verifizieren, VNC als Rückfallweg |
-| ~~Pin-Konflikt HAT gegen Radar~~ | — | **geklärt**: keine Überschneidung, TXD bleibt unbeschaltet |
-| Witty-Pi-Software unter Trixie | Phase 4 blockiert | sofort nach Lieferung testen, nicht erst in KW 39 |
-| 1-Wire aktiv auf GPIO 4 | Pi fährt nach jedem Boot herunter | vor Montage in raspi-config deaktivieren |
-| CPU reicht für Gesten nicht | Phase 5 stockt | Bildrate senken, dann Beschleuniger |
-| Radar durch Spionglas gedämpft | Sensor erkennt nichts | Sensor außerhalb der Glasfläche einbauen |
+The physical build runs independently of the software phases, but two-way
+mirror glass and the panel have long lead times. Orders should therefore
+go out early.
+
+Two dependencies run in both directions:
+
+- Phase 3 determines where in the frame the sensor pocket sits — the frame
+  shouldn't be permanently closed up before that
+- Phase 5 determines the camera position
+
+Build details in [`hardware.md`](hardware.md).
+
+---
+
+## Risks
+
+| Risk | Impact | Mitigation | Status |
+|---|---|---|---|
+| ~~Delivery times~~ | blocks Phase 3 and 4 entirely | order in CW 35, ahead of need | Resolved |
+| ~~Display control under Wayland gets stuck~~ | Phase 2 delayed | verify early, VNC as fallback | Resolved — moved to HDMI-CEC, see ADR-002 |
+| ~~Pin conflict: HAT vs. radar~~ | — | **resolved**: no overlap, TXD stays unwired | Resolved |
+| ~~Witty Pi software on Trixie~~ | Phase 4 blocked | test immediately after delivery, not only in CW 39 | Resolved |
+| 1-Wire active on GPIO 4 | Pi shuts down after every boot | disable in raspi-config before mounting | Verified off |
+| CPU not enough for gestures | Phase 5 stalls | lower frame rate, then accelerator | Open |
+| Radar dampened through two-way mirror glass | sensor detects nothing | sensor pocket in the bottom frame rail — verify at installation | Open |

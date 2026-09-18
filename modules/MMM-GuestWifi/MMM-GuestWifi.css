@@ -5,8 +5,8 @@
 }
 
 .guestwifi-code {
-	/* Weisser Rahmen: QR-Codes brauchen eine helle Ruhezone,
-	   sonst scannen viele Kameras auf schwarzem Grund nicht. */
+	/* White border: QR codes need a bright quiet zone,
+	   otherwise many cameras fail to scan on a black background. */
 	background-color: #fff;
 	padding: 8px;
 	border-radius: 4px;

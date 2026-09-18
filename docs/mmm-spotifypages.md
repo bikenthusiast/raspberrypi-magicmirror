@@ -1,247 +1,108 @@
-/* MMM-SpotifyPages
- *
- * Steuert MMM-pages abhaengig vom Spotify-Wiedergabestatus.
- *
- *   Wiedergabe laeuft   ->  feste Spotify-Seite (Player + Lyrics)
- *   Wiedergabe pausiert ->  Rotation ueber die Leerlaufseiten
- *
- * Beispielaufteilung in MMM-pages:
- *
- *   modules: [
- *     ["MMM-MVG",       "MMM-MyGCalendar"],   // 0  Leerlauf
- *     ["MMM-MVG",       "MMM-Globe"],         // 1  Leerlauf
- *     ["MMM-OnSpotify", "MMM-LiveLyrics"]     // 2  Wiedergabe
- *   ]
- *
- * ---------------------------------------------------------------------
- * Warum Polling statt nur Notifications
- * ---------------------------------------------------------------------
- *
- * MMM-OnSpotify sendet NOW_PLAYING nur an zwei Flanken: bei einem neuen
- * Titel (playerIsEmpty: false) und beim Leeren des Players
- * (playerIsEmpty: true). Pausieren loest keine der beiden aus -- Spotify
- * raeumt den Player erst nach langer Inaktivitaet ab. Der Spiegel bliebe
- * bis dahin auf der Spotify-Seite stehen.
- *
- * Der tatsaechliche Zustand liegt aber im Frontend offen: MMM-OnSpotify
- * fuehrt ihn in "lastStatus" mit den Werten isPlaying, isPlayingHidden,
- * isEmpty und isEmptyHidden. Das Suffix "Hidden" sagt nur, ob das Modul
- * gerade sichtbar ist; ausgewertet wird der Praefix.
- *
- * Dieses Modul liest den Wert regelmaessig aus. NOW_PLAYING bleibt als
- * schneller Zusatzweg erhalten, damit der Wechsel beim Start eines
- * Titels ohne Verzoegerung erfolgt.
- *
- * ---------------------------------------------------------------------
- * Voraussetzung in der config.js
- * ---------------------------------------------------------------------
- *
- * MMM-pages: eigene Rotation abschalten, sonst ueberschreibt dessen
- * Timer die hier getroffene Auswahl.
- *
- *   timings: { default: 0 }
- *
- * MIT License
- */
+# MMM-SpotifyPages
 
-Module.register("MMM-SpotifyPages", {
-	defaults: {
-		// Seite, die bei laufender Wiedergabe gezeigt wird
-		spotifyPage: 2,
+Invisible controller module that decides which `MMM-pages` page the mirror shows. Source:
+[`modules/MMM-SpotifyPages/MMM-SpotifyPages.js`](../modules/MMM-SpotifyPages/MMM-SpotifyPages.js).
 
-		// Seiten, die im Leerlauf rotieren
-		idlePages: [0, 1],
+`MMM-pages` knows which modules belong to which page, but on its own it can only rotate on a timer.
+This module replaces that timer with state: music playing → player page, silence → idle rotation,
+guest page open → hands off.
 
-		// Rotationsdauer im Leerlauf in ms. 0 haelt auf der ersten
-		// Leerlaufseite an.
-		idleRotationMs: 10000,
+---
 
-		// Wartezeit, bevor nach dem Pausieren zurueckgeschaltet wird.
-		// Verhindert Springen bei kurzen Luecken zwischen zwei Titeln.
-		graceMs: 30000,
+## States
 
-		// Abstand der Statusabfrage in ms. 0 schaltet das Polling ab --
-		// dann laeuft es rein flankengesteuert und Pausieren wird nicht
-		// erkannt.
-		pollMs: 5000,
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Idle
+    Idle --> Playing: track starts / isPlaying
+    Playing --> Grace: isEmpty
+    Grace --> Playing: playback resumes
+    Grace --> Idle: graceMs elapsed
+    Idle --> Hidden: SHOW_HIDDEN_PAGE
+    Playing --> Hidden: SHOW_HIDDEN_PAGE
+    Hidden --> Idle: leave or timeout, silent
+    Hidden --> Playing: leave or timeout, playing
+```
 
-		// Modul, dessen lastStatus ausgewertet wird
-		spotifyModule: "MMM-OnSpotify",
+| State | Behavior |
+|---|---|
+| **Idle** | Rotates through `idlePages` every `idleRotationMs`. Resumes where it was interrupted. |
+| **Playing** | Shows `spotifyPage`, rotation stopped. |
+| **Grace** | Playback stopped; waits `graceMs` before returning to Idle, so a gap between two tracks does not flip the page. |
+| **Hidden** | A hidden `MMM-pages` page (the guest Wi-Fi QR code) is open. All timers are stopped and no page switch is sent. After `hiddenPageTimeoutMs` the module sends `LEAVE_HIDDEN_PAGE` itself. On leaving, the playback state is read afresh instead of resuming blindly. |
 
-		debug: false
-	},
+---
 
-	start () {
-		this.playing = false;
-		this.idleIndex = 0;
+## Why polling, not only notifications
 
-		this.graceTimer = null;
-		this.rotationTimer = null;
-		this.pollTimer = null;
+`MMM-OnSpotify` broadcasts `NOW_PLAYING` only on two edges: a new track starts, or the player is
+cleared. **Pausing triggers neither** — Spotify clears the player only after a long idle period, so a
+notification-only controller would sit on the player page for a long time after the music stopped.
 
-		if (this.config.pollMs > 0) {
-			this.pollTimer = setInterval(
-				() => this.poll(),
-				this.config.pollMs
-			);
-		}
+The actual state is available in the frontend: `MMM-OnSpotify` keeps it in `lastStatus`
+(`isPlaying`, `isPlayingHidden`, `isEmpty`, `isEmptyHidden`, plus `onReconnecting` / `onError`). The
+module reads it every `pollMs`:
 
-		this.startRotation(true);
-		Log.info(`${this.name} gestartet`);
-	},
+| `lastStatus` prefix | Interpretation |
+|---|---|
+| `isPlaying…` | playing |
+| `isEmpty…` | silent |
+| anything else | unclear — keep the current state |
 
-	// Unsichtbares Modul -- es steuert nur.
-	getDom () {
-		return document.createElement("div");
-	},
+`NOW_PLAYING` with `playerIsEmpty: false` remains as a fast path, so the switch to the player page
+happens immediately when a track starts rather than on the next poll.
 
-	log (msg) {
-		if (this.config.debug) Log.info(`${this.name}: ${msg}`);
-	},
+---
 
-	// --- Zustand des Nachbarmoduls auslesen ---------------------------
+## Why switches are throttled
 
-	/**
-	 * @returns {boolean|null} true bei Wiedergabe, false bei Stille,
-	 *                         null wenn der Zustand unklar ist
-	 *                         (Modul fehlt, onReconnecting, onError).
-	 */
-	readPlayingState () {
-		const mods = (typeof MM !== "undefined" && MM.getModules)
-			? MM.getModules()
-			: [];
-		const spotify = mods.find((m) => m.name === this.config.spotifyModule);
+`MMM-pages` hides the old page and shows the new one with `setTimeout`-based animations. A second
+`PAGE_SELECT` arriving during that animation can lose the release of the old page's modules: they
+stay locked with an `MMM-pages` lock string and remain invisible, although the page index is correct.
 
-		if (!spotify) {
-			this.log(`${this.config.spotifyModule} nicht gefunden`);
-			return null;
-		}
-		if (typeof spotify.lastStatus !== "string") return null;
+This showed up when leaving the player page, where the switch back and the first rotation step
+follow each other closely. `goToPage()` therefore never sends two switches closer together than
+`minSwitchGapMs`; a switch that would come too early is delayed, and only the most recent request is
+kept. Background: [`troubleshooting-spotifypages.md`](troubleshooting-spotifypages.md).
 
-		// isPlaying / isPlayingHidden -> laeuft
-		// isEmpty   / isEmptyHidden   -> still
-		// onReconnecting / onError    -> unklar, Zustand halten
-		if (spotify.lastStatus.startsWith("isPlaying")) return true;
-		if (spotify.lastStatus.startsWith("isEmpty")) return false;
-		return null;
-	},
+---
 
-	poll () {
-		const state = this.readPlayingState();
-		if (state === null) return;
+## Configuration
 
-		if (state) {
-			if (this.graceTimer) {
-				this.log("Wiedergabe zurueck -- Karenzzeit verworfen");
-				this.clearGrace();
-			}
-			this.showSpotify();
-			return;
-		}
+| Option | Default | Used here | Meaning |
+|---|---|---|---|
+| `spotifyPage` | `2` | `2` | Page index shown while playing |
+| `idlePages` | `[0, 1]` | `[0, 1]` | Pages rotated while idle |
+| `idleRotationMs` | `10000` | `300000` | Rotation interval; `0` stays on the first idle page |
+| `graceMs` | `30000` | default | Delay before returning to idle after playback stops |
+| `pollMs` | `5000` | default | Status poll interval; `0` disables polling (pause is then not detected) |
+| `spotifyModule` | `"MMM-OnSpotify"` | default | Module whose `lastStatus` is read |
+| `respectHiddenPages` | `true` | default | Stay out of the way while a hidden page is open |
+| `minSwitchGapMs` | `700` | default | Minimum time between two page switches |
+| `hiddenPageTimeoutMs` | `120000` | `60000` | Close a hidden page automatically; `0` disables |
+| `debug` | `false` | `false` | Log every decision via `Log.info` |
 
-		// Keine Wiedergabe
-		if (!this.playing) return;
-		if (this.graceTimer) return;
+`MMM-pages` must have its own rotation switched off, otherwise its timer overrides this module:
 
-		this.log(`pausiert -- zurueck in ${this.config.graceMs} ms`);
-		this.graceTimer = setTimeout(() => {
-			this.graceTimer = null;
-			this.showIdle();
-		}, this.config.graceMs);
-	},
-
-	// --- Leerlaufrotation ---------------------------------------------
-
-	stopRotation () {
-		if (this.rotationTimer) {
-			clearInterval(this.rotationTimer);
-			this.rotationTimer = null;
-		}
-	},
-
-	/**
-	 * @param {boolean} jumpNow Sofort auf die aktuelle Leerlaufseite
-	 *                          schalten, statt erst nach einem Intervall.
-	 */
-	startRotation (jumpNow) {
-		this.stopRotation();
-
-		const pages = this.config.idlePages;
-		if (!Array.isArray(pages) || pages.length === 0) {
-			Log.warn(`${this.name}: idlePages ist leer -- keine Rotation.`);
-			return;
-		}
-
-		if (this.idleIndex >= pages.length) this.idleIndex = 0;
-		if (jumpNow) this.goToPage(pages[this.idleIndex]);
-
-		if (pages.length < 2 || this.config.idleRotationMs <= 0) return;
-
-		this.rotationTimer = setInterval(() => {
-			this.idleIndex = (this.idleIndex + 1) % pages.length;
-			this.goToPage(pages[this.idleIndex]);
-		}, this.config.idleRotationMs);
-	},
-
-	// --- Seitenwechsel ------------------------------------------------
-
-	goToPage (index) {
-		// PAGE_SELECT loest das veraltete PAGE_CHANGED ab.
-		// MMM-pages verlangt einen echten Integer, kein String.
-		this.sendNotification("PAGE_SELECT", index);
-		this.log(`Seite ${index}`);
-	},
-
-	clearGrace () {
-		if (this.graceTimer) {
-			clearTimeout(this.graceTimer);
-			this.graceTimer = null;
-		}
-	},
-
-	showSpotify () {
-		this.clearGrace();
-		if (this.playing) return;
-
-		this.playing = true;
-		this.stopRotation();
-		this.goToPage(this.config.spotifyPage);
-	},
-
-	showIdle () {
-		this.clearGrace();
-		if (!this.playing) return;
-
-		this.playing = false;
-		// Rotation dort fortsetzen, wo sie unterbrochen wurde.
-		this.startRotation(true);
-	},
-
-	// --- Schneller Zusatzweg ueber die Notification --------------------
-
-	notificationReceived (notification, payload) {
-		if (notification !== "NOW_PLAYING") return;
-		if (!payload || typeof payload !== "object") return;
-
-		// Reagiert nur auf den Start eines Titels, damit der Wechsel
-		// ohne Wartezeit auf das naechste Polling erfolgt. Das Ende der
-		// Wiedergabe uebernimmt ausschliesslich das Polling -- die
-		// Flanke playerIsEmpty kommt beim Pausieren nicht.
-		if (payload.playerIsEmpty === false) {
-			this.log(`spielt: ${payload.artist} - ${payload.name}`);
-			this.showSpotify();
-		}
-	},
-
-	// Bewusst kein suspend()/resume(): MagicMirror ruft suspend() auf,
-	// sobald ein Modul versteckt wird -- und MMM-pages versteckt alles,
-	// was keiner Seite zugeordnet ist. Dieses Modul hat keine position
-	// und ist damit dauerhaft versteckt. Wuerde es bei suspend() seine
-	// Timer abraeumen, blieben Rotation und Polling stehen.
-
-	stop () {
-		this.clearGrace();
-		this.stopRotation();
-		if (this.pollTimer) clearInterval(this.pollTimer);
+```js
+{
+	module: "MMM-pages",
+	config: {
+		timings: { default: 0 },
+		// ...
 	}
-});
+}
+```
+
+---
+
+## Implementation notes
+
+- **No `suspend()`/`resume()`.** MagicMirror suspends a module as soon as it is hidden, and `MMM-pages`
+  hides everything not assigned to a page. This module has no position and is therefore permanently
+  hidden; clearing timers in `suspend()` would stop rotation and polling.
+- **`PAGE_SELECT` with an integer.** It replaces the deprecated `PAGE_CHANGED`, and `MMM-pages`
+  ignores string indices.
+- **Last guard in `emitPage()`.** Even timers that were scheduled before a hidden page opened cannot
+  send a switch while it is open.

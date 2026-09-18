@@ -1,0 +1,20 @@
+# Witty Pi 4 schedule for the mirror: on 07:30, off 22:15, every day.
+#
+# Install (see docs/setup.md, section 14):
+#   cp config/mirror.wpi.example ~/Projects/wittypi/schedules/mirror.wpi
+#   cd ~/Projects/wittypi && ./wittyPi.sh     # menu item 6, pick mirror.wpi
+#
+# Rules that bit before:
+#   - ON + OFF must add up to exactly 24 h, or the cycle drifts every day.
+#     07:30-22:15 is 14 h 45 min on, 9 h 15 min off.
+#   - BEGIN must be a switch-on moment and must not lie in the past when the
+#     schedule is loaded: set it to the next 07:30 before copying.
+#     A past BEGIN can make the script compute the next transition as
+#     already due and power the Pi down on the spot.
+#   - The file must sit in ~/Projects/wittypi/schedules/, or menu item 6
+#     does not offer it.
+
+BEGIN   2026-01-01 07:30:00
+END     2035-12-31 23:59:59
+ON      H14 M45
+OFF     H9  M15
