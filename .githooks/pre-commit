@@ -1,64 +1,63 @@
 #!/usr/bin/env bash
 #
-# pre-commit -- verhindert das Committen von Geheimnissen
+# pre-commit -- prevents secrets from being committed
 #
-# Installation (aus dem Repo-Wurzelverzeichnis):
+# Installation (the hook is already versioned in this repo at
+# .githooks/pre-commit):
 #
-#   mkdir -p .githooks
-#   cp pre-commit .githooks/pre-commit
-#   chmod +x .githooks/pre-commit
 #   git config core.hooksPath .githooks
+#   chmod +x .githooks/pre-commit   # only if the executable bit got lost
 #
-# core.hooksPath sorgt dafuer, dass Git die Hooks aus dem versionierten
-# Verzeichnis nimmt statt aus .git/hooks/. Damit ist der Hook Teil des Repos
-# und nach einem Clone auf einem anderen Rechner sofort da -- dort muss nur
-# einmal das git config gesetzt werden.
+# core.hooksPath makes Git take hooks from this versioned directory instead
+# of .git/hooks/. That means the hook is part of the repo and is already
+# there right after a clone on another machine -- only the git config needs
+# to be set once there.
 #
-# Umgehen (bewusst, in Ausnahmefaellen):  git commit --no-verify
+# Bypass (intentionally, in exceptional cases):  git commit --no-verify
 #
 set -uo pipefail
 
-# Muster, die auf ein echtes Geheimnis hindeuten.
-# Format: "Beschreibung|Regex (ERE)"
+# Patterns that indicate an actual secret.
+# Format: "Description|Regex (ERE)"
 PATTERNS=(
-	"Private Google-Kalender-URL (enthaelt Auth-Token)|calendar\.google\.com/calendar/ical/"
-	"iCal-Token|private-[0-9a-f]{20,}"
-	"API-Key als Hex-String|(apiKey|api_key|token|secret)[\"' ]*[:=][\"' ]*[0-9a-fA-F]{16,}"
-	"Spotify-Credential|(clientID|clientSecret|accessToken|refreshToken)[\"' ]*[:=][\"' ]*[A-Za-z0-9_-]{16,}"
-	"WLAN-Zeichenkette mit Passwort|WIFI:T:[^;]*;S:[^;]*;P:.+"
-	"E-Mail-Adresse|[a-zA-Z0-9._%+-]+@(gmail|googlemail|web|gmx|outlook|hotmail)\.[a-z]{2,}"
+	"Private Google Calendar URL (contains an auth token)|calendar\.google\.com/calendar/ical/"
+	"iCal token|private-[0-9a-f]{20,}"
+	"API key as a hex string|(apiKey|api_key|token|secret)[\"' ]*[:=][\"' ]*[0-9a-fA-F]{16,}"
+	"Spotify credential|(clientID|clientSecret|accessToken|refreshToken)[\"' ]*[:=][\"' ]*[A-Za-z0-9_-]{16,}"
+	"Wi-Fi string with password|WIFI:T:[^;]*;S:[^;]*;P:.+"
+	"Email address|[a-zA-Z0-9._%+-]+@(gmail|googlemail|web|gmx|outlook|hotmail)\.[a-z]{2,}"
 	"AWS Access Key|AKIA[0-9A-Z]{16}"
-	"Privater Schluessel|-----BEGIN [A-Z ]*PRIVATE KEY-----"
-	"Generischer 32er-Hex-Key|[\"'][0-9a-f]{32}[\"']"
+	"Private key|-----BEGIN [A-Z ]*PRIVATE KEY-----"
+	"Generic 32-char hex key|[\"'][0-9a-f]{32}[\"']"
 )
 
-# Zeilen mit diesen Ausdruecken gelten als Platzhalter und werden ignoriert.
+# Lines matching these expressions are treated as placeholders and ignored.
 ALLOWLIST='DEIN_|DEINE_|YOUR_|PLACEHOLDER|CHANGEME|<[a-z_]+>|\$\{[A-Z_]+\}|xxxx|example\.(com|org)|@example|Mein[A-Z]|mein[A-Z]|beispiel|Beispiel'
-# Dateien, die ohnehin nie committet werden sollen.
+# Files that should never be committed in the first place.
 FORBIDDEN_FILES='(^|/)(\.env|secrets\.js|credentials\.json|.*\.pem|.*\.key)$'
 
 RED=$'\033[0;31m'; YELLOW=$'\033[0;33m'; GREEN=$'\033[0;32m'; NC=$'\033[0m'
 
 fail=0
 
-# --- 1. Verbotene Dateinamen -------------------------------------------------
+# --- 1. Forbidden filenames --------------------------------------------------
 
 while IFS= read -r file; do
 	[[ -z "$file" ]] && continue
 	if [[ "$file" =~ $FORBIDDEN_FILES ]]; then
-		echo "${RED}BLOCKIERT${NC}  Datei gehoert nicht ins Repo: ${YELLOW}$file${NC}"
-		echo "          Aus dem Staging nehmen:  git rm --cached '$file'"
-		echo "          Und in .gitignore aufnehmen."
+		echo "${RED}BLOCKED${NC}  File does not belong in the repo: ${YELLOW}$file${NC}"
+		echo "          Remove from staging:  git rm --cached '$file'"
+		echo "          And add it to .gitignore."
 		echo
 		fail=1
 	fi
 done < <(git diff --cached --name-only --diff-filter=ACM)
 
-# --- 2. Inhalte der hinzugefuegten Zeilen ------------------------------------
+# --- 2. Content of added lines -----------------------------------------------
 
-# Nur hinzugefuegte Zeilen pruefen (beginnen mit +, aber nicht +++).
-# Der Dateiname wird aus den diff-Kopfzeilen mitgefuehrt, damit die Meldung
-# sagt, wo der Treffer sitzt.
+# Only check added lines (start with +, but not +++).
+# The filename is carried along from the diff header lines, so the message
+# says where the match is.
 staged_added="$(git diff --cached -U0 | awk '
 	/^\+\+\+ b\// { file = substr($0, 7); next }
 	/^\+/ && !/^\+\+\+/ { print file "\t" substr($0, 2) }
@@ -74,9 +73,9 @@ if [[ -n "$staged_added" ]]; then
 			| grep -Ei -e "$regex" || true)"
 
 		if [[ -n "$hits" ]]; then
-			echo "${RED}BLOCKIERT${NC}  $desc"
+			echo "${RED}BLOCKED${NC}  $desc"
 			printf '%s\n' "$hits" | head -5 | while IFS=$'\t' read -r f line; do
-				# Lange Zeilen kuerzen, damit das Terminal lesbar bleibt
+				# Truncate long lines so the terminal output stays readable
 				short="$(printf '%.100s' "$line")"
 				echo "          ${YELLOW}${f}${NC}: ${short}"
 			done
@@ -86,24 +85,24 @@ if [[ -n "$staged_added" ]]; then
 	done
 fi
 
-# --- 3. Ergebnis -------------------------------------------------------------
+# --- 3. Result ----------------------------------------------------------------
 
 if (( fail )); then
 	cat <<-EOF
-	${RED}Commit abgebrochen.${NC}
+	${RED}Commit aborted.${NC}
 
-	Wenn es sich um ein echtes Geheimnis handelt:
-	  1. Wert aus der Datei entfernen und durch einen Platzhalter ersetzen
-	  2. Echten Wert in .env ablegen (chmod 600, in .gitignore)
-	  3. Geheimnis rotieren, falls es schon irgendwo sichtbar war
+	If this is an actual secret:
+	  1. Remove the value from the file and replace it with a placeholder
+	  2. Put the real value in config/secrets.js (gitignored, chmod 600)
+	  3. Rotate the secret if it was ever visible anywhere else
 
-	Wenn es ein Fehlalarm ist:
-	  - Platzhalter wie DEIN_API_KEY oder \${VAR} werden ignoriert
-	  - Oder einmalig umgehen:  git commit --no-verify
+	If this is a false positive:
+	  - Placeholders like DEIN_API_KEY or \${VAR} are ignored
+	  - Or bypass once:  git commit --no-verify
 
 	EOF
 	exit 1
 fi
 
-echo "${GREEN}pre-commit${NC}  keine Geheimnisse im Staging gefunden."
+echo "${GREEN}pre-commit${NC}  no secrets found in staging."
 exit 0

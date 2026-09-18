@@ -1,84 +1,86 @@
 # MMM-GuestWifi
 
-Eigenentwicklung. Zeigt einen QR-Code für das Gast-WLAN an — Besucher scannen
-ihn mit der Kamera-App und sind verbunden, ohne dass jemand ein Passwort
-vorlesen muss.
+Custom module. Shows a QR code for the guest Wi-Fi — visitors scan it with
+their camera app and are connected, without anyone having to read a password
+out loud.
 
-## Voraussetzungen
+## Requirements
 
 > [!IMPORTANT]
-> **`qrencode` muss installiert sein.** Ohne das Paket bricht
-> `make-guest-qr.sh` ab mit:
+> **`qrencode` must be installed.** Without the package, `make-guest-qr.sh`
+> aborts with:
 >
 > ```
-> FEHLER: qrencode fehlt. Installation: sudo apt install qrencode
+> ERROR: qrencode is missing. Install with: sudo apt install qrencode
 > ```
 
-| Voraussetzung | Installation | Zweck |
+| Requirement | Installation | Purpose |
 |---|---|---|
-| `qrencode` | `sudo apt install qrencode` | erzeugt die PNG-Datei |
-| `.env` mit Zugangsdaten | siehe unten | Quelle für SSID und Passwort |
+| `qrencode` | `sudo apt install qrencode` | generates the PNG file |
+| `config/secrets.js` with credentials | see below | source for SSID and password |
 
-Auf macOS lautet der Befehl `brew install qrencode` — relevant, falls der Code
-auf dem Entwicklungsrechner erzeugt und übertragen wird.
+On macOS the command is `brew install qrencode` — relevant if the code is
+generated on the development machine and transferred over.
 
-Sonst keine. Das Modul bringt bewusst **keine JavaScript-Abhängigkeit** mit.
+Nothing else. The module deliberately ships **no JavaScript dependency**.
 
-## Warum ohne QR-Bibliothek
+## Why without a QR library
 
-Das zuvor eingesetzte `uxigene/MMM-QRCode` erzeugte den Code zur Laufzeit im
-Browser und scheiterte an einem Versionskonflikt:
+The previously used `uxigene/MMM-QRCode` generated the code at runtime in
+the browser and broke on a version conflict:
 
 ```
 Uncaught TypeError: QRCode.toCanvas is not a function
 ```
 
-Das Modul erwartete die API des npm-Pakets `qrcode`, im globalen Namensraum
-landete aber eine andere Bibliothek. Solche Konflikte entstehen bei wenig
-gepflegten Modulen mit offener Versionsangabe immer wieder — `npm install` holt
-dann eine neuere Hauptversion mit geänderter API.
+The module expected the API of the npm package `qrcode`, but a different
+library ended up in the global namespace. Conflicts like this keep coming up
+with loosely maintained modules that pin an open version range — `npm
+install` then pulls in a newer major version with a changed API.
 
-Dieses Modul umgeht das Problem, statt es zu lösen: Der Code wird einmalig per
-`qrencode` als PNG erzeugt, das Modul zeigt nur das Bild. Es gibt keine
-Bibliothek, die brechen könnte.
+This module sidesteps the problem instead of solving it: the code is
+generated once as a PNG with `qrencode`, and the module just displays the
+image. There's no library left that could break.
 
-Zwei weitere Vorteile:
+Two further advantages:
 
-**Das Escaping passiert an einer Stelle.** Im WIFI-URI-Schema müssen `\ ; , : "`
-mit einem Backslash versehen werden. Das übernimmt die Shell beim Erzeugen, statt
-dass es in JavaScript zur Laufzeit passieren muss — wo ein literaler Backslash
-doppelt geschrieben werden will und der Fehler erst beim Scannen auffällt.
+**Escaping happens in exactly one place.** In the WIFI URI scheme, `\ ; , : "`
+must be prefixed with a backslash. The shell handles that at generation time,
+instead of it having to happen in JavaScript at runtime — where a literal
+backslash needs to be doubled and the mistake only shows up once you try to
+scan the code.
 
-**Das Passwort verlässt das Gerät nicht.** `qrencode` arbeitet lokal, anders als
-die zahllosen Online-Generatoren.
+**The password never leaves the device.** `qrencode` works locally, unlike
+the countless online generators.
 
-## Einrichtung
+## Setup
 
 ```bash
-# Modul verlinken
+# Link the module
 ln -sfn ~/Projects/raspberrypi-magicmirror/modules/MMM-GuestWifi \
         ~/Projects/MagicMirror/modules/MMM-GuestWifi
 
-# QR-Code erzeugen
+# Generate the QR code
 cd ~/Projects/raspberrypi-magicmirror
 ./scripts/make-guest-qr.sh
 ```
 
-Das Skript liest aus der `.env`:
+The script reads its values from `config/secrets.js` (create it from the
+`config/secrets.example.js` template if it doesn't exist yet):
 
-| Variable | Pflicht | Bedeutung |
+| Key | Required | Meaning |
 |---|---|---|
-| `GUEST_WIFI_SSID` | ja | Netzname, exakt wie ausgesendet |
-| `GUEST_WIFI_PASS` | ja | Passwort des Gastnetzes |
-| `GUEST_WIFI_TYPE` | nein | `WPA` (Standard) oder `nopass` für offene Netze |
+| `guestWifiSsid` | yes | network name, exactly as broadcast |
+| `guestWifiPass` | yes, unless `guestWifiType` is `"nopass"` | password of the guest network |
+| `guestWifiType` | no | `"WPA"` (default) or `"nopass"` for open networks |
 
-Zur Kontrolle gibt es den Code zusätzlich im Terminal aus. Der lässt sich direkt
-mit dem Handy scannen — funktioniert er dort, liegt ein späteres Problem am
-Spiegel und nicht an der Zeichenkette.
+For verification, the script also prints the code in the terminal. It can be
+scanned directly with a phone — if it works there, a later problem lies with
+the mirror's display, not with the encoded string.
 
-Nach jeder Änderung von SSID oder Passwort das Skript erneut ausführen.
+Re-run the script after every change to SSID or password.
 
-## Konfiguration
+## Configuration
 
 ```js
 {
@@ -91,20 +93,20 @@ Nach jeder Änderung von SSID oder Passwort das Skript erneut ausführen.
 }
 ```
 
-| Option | Standard | Bedeutung |
+| Option | Default | Meaning |
 |---|---|---|
-| `image` | `"guest-wifi.png"` | Dateiname im Modulordner |
-| `imageSize` | `220` | Kantenlänge in Pixeln |
-| `ssid` | `""` | Netzname unter dem Code anzeigen. Leer lassen, um ihn wegzulassen |
-| `caption` | `"Zum Verbinden scannen"` | Hinweistext |
+| `image` | `"guest-wifi.png"` | filename inside the module folder |
+| `imageSize` | `220` | edge length in pixels |
+| `ssid` | `""` | show the network name under the code. Leave empty to omit it |
+| `caption` | `"Zum Verbinden scannen"` | caption text |
 
-`ssid` ist bewusst standardmäßig leer: Auf einem Wandspiegel verrät der Netzname
-mehr, als manchem lieb ist — für einen Gast reicht der Code.
+`ssid` is deliberately empty by default: on a wall mirror the network name
+reveals more than some people would like — for a guest, the code is enough.
 
-## Versteckte Seite
+## Hidden page
 
-Im Zusammenspiel mit MMM-pages liegt das Modul auf einer versteckten Seite und
-ist nicht Teil der Rotation:
+In combination with MMM-pages, the module lives on a hidden page and is not
+part of the rotation:
 
 ```js
 hiddenPages: {
@@ -112,113 +114,119 @@ hiddenPages: {
 }
 ```
 
-### Aufruf aus der Browserkonsole
+### Show/hide script
+
+```bash
+./scripts/guest-page.sh show
+./scripts/guest-page.sh hide
+```
+
+This calls the `/remote` route of MMM-Remote-Control, using the `remoteApiKey`
+from `config/secrets.js`. `/remote` passes a plain-string payload through
+as-is, which is what MMM-pages needs for `SHOW_HIDDEN_PAGE` — see below for
+why that matters.
+
+### Calling it from the browser console
 
 ```js
 MM.getModules()[0].sendNotification("SHOW_HIDDEN_PAGE", "gast")
 MM.getModules()[0].sendNotification("LEAVE_HIDDEN_PAGE")
 ```
 
-Beide geben `undefined` zurück — `sendNotification` hat keinen Rückgabewert.
-Das ist kein Fehler.
+Both return `undefined` — `sendNotification` has no return value. That's not
+an error.
 
-### Aufruf per HTTP
-
-Über MMM-Remote-Control, damit die Seite auch von Skripten, Tastern oder
-später der Gestenerkennung aufgerufen werden kann:
-
-```bash
-KEY=$(grep -oP 'apiKey:\s*"\K[^"]+' ~/Projects/MagicMirror/config/config.js)
-
-curl -H "Authorization: apiKey $KEY" \
-     "http://localhost:8080/api/notification/SHOW_HIDDEN_PAGE/gast"
-
-curl -H "Authorization: apiKey $KEY" \
-     "http://localhost:8080/api/notification/LEAVE_HIDDEN_PAGE"
-```
+### Why not `/api/notification`
 
 > [!IMPORTANT]
-> **Der API-Key muss in den Header, nicht in die URL.** Und der Seitenname
-> `gast` ist ein Pfadsegment, kein Query-Parameter.
+> **The API key must go in the header, not the URL** — and the page name
+> `gast` is a path segment, not a query parameter.
 >
-> Der Grund steht in `MMM-Remote-Control/API/api.js`:
+> The reason is in `MMM-Remote-Control/API/api.js`:
 >
 > ```js
 > 537   payload = request.params.p;
 > 539   payload = {param: request.params.p, ...request.query};
 > ```
 >
-> Zeile 537 reicht den Wert unverpackt durch — aber nur, wenn die Anfrage
-> **keinen** Query-String hat. Sobald einer vorhanden ist, und `?apiKey=…` ist
-> einer, greift Zeile 539 und baut ein Objekt daraus. MMM-pages sucht dann
-> nach einer Seite namens `[object Object]`:
+> Line 537 passes the value straight through unwrapped — but only if the
+> request has **no** query string. As soon as one is present, and
+> `?apiKey=…` counts as one, line 539 kicks in and wraps it into an object.
+> MMM-pages then looks for a page called `[object Object]`:
 >
 > ```
 > [MMM-pages] Hidden page "[object Object]" does not exist!
 > ```
 >
-> Dieselbe Meldung erscheint bei Übergabe im Body. Ein nackter String wird vom
-> Body-Parser zusätzlich abgelehnt (`"gast" is not valid JSON`).
+> The same message shows up when passing it in the body. A bare string is
+> also rejected by the body parser (`"gast" is not valid JSON`).
 >
-> Nebeneffekt der Header-Variante: Der Schlüssel landet nicht in Server-Logs
-> oder im Shell-Verlauf.
+> Side effect of the header approach: the key doesn't end up in server logs
+> or shell history.
 
-Für Notifications ohne Payload — etwa `LEAVE_HIDDEN_PAGE` — funktioniert auch
-`?apiKey=…` in der URL. Der Header ist trotzdem die bessere Gewohnheit.
+`scripts/guest-page.sh` avoids this whole class of problem by using the
+`/remote` route instead, which passes a plain string through regardless of
+query parameters.
+
+For notifications without a payload — `LEAVE_HIDDEN_PAGE`, for example —
+`?apiKey=…` in the URL works fine too on `/api/notification`. The header is
+still the better habit.
 
 > [!NOTE]
-> `MMM-SpotifyPages` steuert dieselbe Seitenauswahl und weiß nichts von der
-> versteckten Seite. Ein Rotationsschritt oder ein Spotify-Ereignis blendet den
-> QR-Code deshalb wieder aus. Für einen Test die Rotation vorher anhalten:
+> `MMM-SpotifyPages` controls the same page selection and knows nothing
+> about the hidden page. A rotation step or a Spotify event will therefore
+> hide the QR code again. To test, pause the rotation first:
 >
 > ```js
 > m = MM.getModules().find(x => x.name === "MMM-SpotifyPages")
 > m.stopRotation()
 > ```
 
-## Sicherheit
+## Security
 
 > [!CAUTION]
-> **`guest-wifi.png` enthält das WLAN-Passwort** und gehört in die `.gitignore`:
+> **`guest-wifi.png` contains the Wi-Fi password** and belongs in
+> `.gitignore`:
 >
 > ```gitignore
 > modules/MMM-GuestWifi/guest-wifi.png
 > ```
 >
-> Der Pre-Commit-Hook prüft Textinhalte und erkennt Binärdateien nicht. Diese
-> Zeile ist deshalb nicht optional.
+> The pre-commit hook checks text content and doesn't detect binary files.
+> This line is therefore not optional.
 
-Der Code wird aus der `.env` erzeugt, die ebenfalls nicht im Repo liegt. Im
-Repository steht damit weder das Passwort noch etwas, woraus es sich ableiten
-ließe.
+The code is generated from `config/secrets.js`, which is also gitignored.
+Neither the password nor anything it could be derived from lives in the
+repository.
 
-Ein permanent sichtbarer WLAN-Code ist beim Gastnetz vertretbar, weil es vom
-Hauptnetz isoliert ist. Für das Hauptnetz wäre davon abzuraten.
+A permanently visible Wi-Fi code is acceptable for the guest network because
+it's isolated from the main network. It would not be advisable for the main
+network.
 
-## Gestaltung
+## Design
 
-Der weiße Rahmen um den Code kommt aus dem CSS und ist funktional: QR-Codes
-brauchen eine helle Ruhezone, sonst scannen viele Kameras auf schwarzem Grund
-nicht zuverlässig.
+The white border around the code comes from the CSS and is functional: QR
+codes need a bright quiet zone, otherwise many cameras fail to scan reliably
+on a black background.
 
-Die Fehlerkorrektur steht auf Stufe M. Das ist gutmütiger gegenüber
-Spiegelungen im Glas als die sparsamere Stufe L, ohne den Code unnötig dicht zu
-machen.
+Error correction is set to level M. That's more forgiving of reflections in
+the glass than the sparser level L, without making the code unnecessarily
+dense.
 
-## Fehlersuche
+## Troubleshooting
 
-| Symptom | Ursache |
+| Symptom | Cause |
 |---|---|
-| „QR-Code fehlt" im Modul | `make-guest-qr.sh` wurde nicht ausgeführt oder der Symlink zeigt ins Leere |
-| Alter Code trotz Neuerzeugung | sollte der Cache-Buster verhindern; sonst hart neu laden |
-| Code scannt, verbindet aber nicht | SSID stimmt nicht zeichengenau, oder der Verschlüsselungstyp passt nicht |
-| Code wird gar nicht erkannt | zu klein — `imageSize` erhöhen |
+| "QR-Code fehlt" in the module | `make-guest-qr.sh` wasn't run, or the symlink points nowhere |
+| Old code shown despite regenerating | the cache buster should prevent this; otherwise hard-reload |
+| Code scans but doesn't connect | SSID doesn't match character-for-character, or the encryption type is wrong |
+| Code isn't recognized at all | too small — increase `imageSize` |
 
-Gegenprobe unabhängig vom Spiegel:
+A check independent of the mirror:
 
 ```bash
 qrencode -t ANSIUTF8 'WIFI:T:WPA;S:MeineSSID;P:meinPasswort;;'
 ```
 
-Scannt dieser Code und der im Spiegel nicht, liegt es an der Anzeige. Scannt
-keiner von beiden, stimmt die Zeichenkette nicht.
+If this code scans and the one on the mirror doesn't, the problem is the
+display. If neither scans, the encoded string is wrong.
