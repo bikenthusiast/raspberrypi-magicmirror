@@ -137,3 +137,9 @@ The script reads the API key from `config/secrets.js` and calls MMM-Remote-Contr
 
 MIT — see [`LICENSE`](LICENSE). Third-party modules are cloned at install time and remain under their own
 licenses; see the linked repositories.
+
+## Credits
+
+The track shown in the demo is *I'll Be Right Behind You, Josephine* by
+[Josh Woodward](https://www.joshwoodward.com/), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
