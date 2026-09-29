@@ -60,7 +60,7 @@ Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr/).
 | Display server | Wayland with the labwc compositor; `kanshi` for persistent rotation |
 | Application | MagicMirror² 2.37 under Electron |
 | Process management | systemd **user** service, logging to the journal |
-| Display power | HDMI-CEC via `/dev/cec1`, driven by the presence sensor ([ADR-002](docs/adr/002-display-power-cec.md)) |
+| Display power | HDMI-CEC via `/dev/cec0`, driven by the presence sensor ([ADR-002](docs/adr/002-display-power-cec.md)) |
 | Power schedule | Witty Pi 4 Mini, on 07:30 / off 22:15 ([ADR-005](docs/adr/005-power-management.md)) |
 
 ---
