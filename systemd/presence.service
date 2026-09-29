@@ -44,9 +44,12 @@ Environment=PRESENCE_GRACE=120
 Environment=PRESENCE_BOUNCE=0.5
 Environment=PRESENCE_MIN_GAP=5
 
-# The Pi 4 exposes one CEC device per HDMI port. cec0 is the first
-# port, cec1 the second. The wrong one fails with errno=64 (ENONET).
-Environment=CEC_DEVICE=/dev/cec1
+# One CEC device per HDMI port: HDMI0 (inner, next to USB-C) is
+# HDMI-A-1 and /dev/cec0, HDMI1 (outer) is HDMI-A-2 and /dev/cec1.
+# Confirm with `cec-ctl -d /dev/cecN` -- it prints the adapter name and
+# the DRM connector. A device without a display reports the physical
+# address f.f.f.f and swallows every command silently.
+Environment=CEC_DEVICE=/dev/cec0
 Environment=CEC_TARGET=0
 
 NoNewPrivileges=true

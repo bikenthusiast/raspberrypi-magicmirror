@@ -246,13 +246,92 @@ mounting.
 
 ---
 
+## HDMI wiring and CEC
+
+Two independent choices have to be right, and neither reports an error when it
+is wrong.
+
+**1 · Which socket on the Pi.** The Pi 4 exposes one CEC device per HDMI port,
+and the numbering is off by one between sockets and DRM connectors:
+
+| Socket | DRM connector | CEC device | Adapter name |
+|---|---|---|---|
+| HDMI0 (inner, next to USB-C) | `HDMI-A-1` | `/dev/cec0` | `vc4-hdmi-0` |
+| HDMI1 (outer) | `HDMI-A-2` | `/dev/cec1` | `vc4-hdmi-1` |
+
+Never go by the digit alone. `cec-ctl -d /dev/cecN` without arguments prints
+`Adapter Name` and `DRM Connector Info`, which is the unambiguous mapping.
+
+**2 · Which input on the monitor.** The MSI PRO MP273QW E14 carries CEC on
+**HDMI 1 only**. Its user guide states this in a single line of the connector
+specification — "HDMI 1: Supports HDMI™ CEC" — while the entry for HDMI 2 omits
+it. On HDMI 2 everything transmits without error and nothing happens. In
+addition, CEC has to be enabled in the monitor's OSD menu.
+
+### Verifying the chain
+
+```bash
+# 1. Which socket has a display at all?
+for c in /sys/class/drm/card*-HDMI*; do echo "$c: $(cat $c/status)"; done
+
+# 2. Physical address — read from the display's EDID
+cec-ctl -d /dev/cec0 | grep -E "Adapter Name|Physical Address"
+
+# 3. Register once (does not survive a reboot), then look at the bus
+cec-ctl -d /dev/cec0 --playback --osd-name MagicMirror
+cec-ctl -d /dev/cec0 -S
+
+# 4. Switch
+cec-ctl -d /dev/cec0 --to 0 --standby
+cec-ctl -d /dev/cec0 --to 0 --image-view-on
+```
+
+Read the physical address like this:
+
+| Value | Meaning |
+|---|---|
+| `1.0.0.0` | connected to input 1 of the monitor — the one with CEC |
+| `2.0.0.0` | connected to input 2 — transmits, but nobody listens |
+| `f.f.f.f` | no display detected: wrong socket, cable out, or the monitor was asleep when it was plugged in |
+
+A valid address only appears after a hotplug event with the monitor switched
+on. If it stays at `f.f.f.f` after re-plugging, reboot with the monitor on.
+
+### cec-ctl exits 0 even when nothing happened
+
+This is the trap that costs an evening. `cec-ctl` reports success as soon as it
+has put the message on the bus. Whether anyone answered is only visible in the
+message body:
+
+```
+Transmit from Playback Device 1 to TV (4 to 0):
+STANDBY (0x36)
+        Tx, Not Acknowledged (4), Max Retries      <- nobody answered
+```
+
+Without a physical address there is not even that much — the transmit then
+reads `from Unregistered to TV (15 to 0)` and ends silently. `presence.py`
+therefore checks the output for both signatures instead of trusting the exit
+code, and verifies the physical address before registering.
+
+| Symptom | Diagnosis |
+|---|---|
+| `Physical Address: f.f.f.f` | no display on this CEC device |
+| `from Unregistered` in the transmit | sent without a logical address, see above |
+| `Not Acknowledged`, `Max Retries` | nothing on address 0 answered: wrong monitor input, or CEC off in the OSD |
+| `-S` shows only the Pi itself | same cause |
+| Everything looks fine, panel stays on | CEC disabled in the OSD; on some models the setting only takes effect after disconnecting the monitor from mains |
+
+---
+
 ## Display control
 
 The panel is put into standby and woken over HDMI-CEC by `scripts/presence.py`
-using `cec-ctl` on `/dev/cec1`. The Pi 4 exposes one CEC device per HDMI port
-(cec0 = first port, cec1 = second); using the wrong one fails with
-`errno=64 ENONET`. CEC target 0 is always the display. The user running the
-script must be in the `video` group.
+using `cec-ctl` on `/dev/cec0`. CEC target 0 is always the display. The user
+running the script must be in the `video` group.
+
+Both ends of the cable decide whether this works at all — see
+[HDMI wiring and CEC](#hdmi-wiring-and-cec) below.
 
 **Why not the compositor:** under labwc, both `wlopm` and `wlr-randr --off`
 disable the output entirely instead of putting the panel into standby. The
@@ -330,5 +409,7 @@ position is finalized.
 | Witty Pi software under Trixie | done — installed, board mounted, schedule active |
 | Fan reconnected after mounting | done |
 | Display control under Wayland/labwc | done — replaced by HDMI-CEC, see ADR-002 |
+| Presence detection in operation | **done** — `presence.service` enabled and running, GPIO 27 switches reliably |
+| CEC port and monitor input | **done** — `/dev/cec0`, monitor input HDMI 1, see [HDMI wiring and CEC](#hdmi-wiring-and-cec) |
 | Adjust sensitivity zones | only meaningful at the installation location |
 | CPU headroom for gesture recognition | open, measure before phase 5 |

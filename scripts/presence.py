@@ -28,11 +28,42 @@ to re-apply, so there is nothing to fail.
 Cost: waking the panel takes two to three seconds. That is the
 monitor's own wake-up time, the same as pressing its power button.
 
-Note on the device node
------------------------
-The Pi 4 has two HDMI ports and exposes one CEC device per port.
-`/dev/cec0` is the first port, `/dev/cec1` the second. Addressing the
-wrong one fails with errno=64 (ENONET) and no further explanation.
+Which device node, which HDMI port
+----------------------------------
+The Pi 4 has two HDMI ports and exposes one CEC device per port:
+
+    HDMI0 (inner, next to USB-C)  ->  HDMI-A-1  ->  /dev/cec0
+    HDMI1 (outer)                 ->  HDMI-A-2  ->  /dev/cec1
+
+The numbering is off by one between the sockets and the DRM
+connectors, so never go by the digit alone. `cec-ctl -d /dev/cecN`
+without further arguments prints "Adapter Name" (vc4-hdmi-0 or -1) and
+"DRM Connector Info", which is the only unambiguous mapping.
+
+The monitor end matters too. On the MSI PRO MP273QW E14 only **HDMI 1**
+carries CEC; its user guide mentions it in a single line of the
+specification table. On HDMI 2 everything transmits without error and
+nothing ever happens.
+
+Checking for a valid connection: `Physical Address` is read from the
+display's EDID. `1.0.0.0` means input 1 of the monitor, `2.0.0.0`
+input 2, and `f.f.f.f` means no display was detected at all -- an
+unplugged cable, the wrong port, or a monitor that was asleep when the
+cable was connected.
+
+Why the output is parsed and not just the exit code
+---------------------------------------------------
+`cec-ctl` exits 0 whenever it managed to put the message on the bus,
+even when no device acknowledged it. A transmit into the void looks
+like this, and still exits 0:
+
+    Transmit from Playback Device 1 to TV (4 to 0):
+    STANDBY (0x36)
+        Tx, Not Acknowledged (4), Max Retries
+
+Trusting the exit code makes the service report "Panel standby" while
+the mirror keeps glowing in the hallway. Both checks below exist for
+that reason.
 
 Requirements:
     sudo apt install python3-gpiozero python3-lgpio v4l-utils
@@ -62,7 +93,7 @@ BOUNCE_SECONDS = float(os.environ.get("PRESENCE_BOUNCE", "0.5"))
 # time to settle and produces visible flicker.
 MIN_SWITCH_GAP = float(os.environ.get("PRESENCE_MIN_GAP", "5"))
 
-CEC_DEVICE = os.environ.get("CEC_DEVICE", "/dev/cec1")
+CEC_DEVICE = os.environ.get("CEC_DEVICE", "/dev/cec0")
 
 # Logical CEC address of the monitor. 0 is always the display.
 CEC_TARGET = os.environ.get("CEC_TARGET", "0")
@@ -80,13 +111,31 @@ log = logging.getLogger("presence")
 
 # --- CEC -------------------------------------------------------------
 
+# cec-ctl reports an unacknowledged transmit in the message body, not
+# in its exit code.
+NOT_ACKNOWLEDGED = "Not Acknowledged"
+
+# Sent without a logical address of our own. Happens when the adapter
+# never got a physical address, and then not even a NACK comes back --
+# the line below is the only trace such a transmit leaves.
+UNREGISTERED = "from Unregistered"
+
+# Physical address read from the display's EDID; f.f.f.f means none.
+INVALID_ADDRESS = "f.f.f.f"
+
+
 def run_cec(args, timeout=15):
-    """Run cec-ctl. Returns (ok, combined output)."""
+    """Run cec-ctl. Returns (ok, combined output).
+
+    A transmit that nobody acknowledged, or that went out without a
+    logical address, counts as a failure even though cec-ctl exits 0
+    for both -- see the module docstring."""
     cmd = ["cec-ctl", "-d", CEC_DEVICE] + args
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         out = (r.stdout or "") + (r.stderr or "")
-        return r.returncode == 0, out
+        failed = NOT_ACKNOWLEDGED in out or UNREGISTERED in out
+        return r.returncode == 0 and not failed, out
     except FileNotFoundError:
         log.error("cec-ctl not found. Install with: sudo apt install v4l-utils")
         sys.exit(1)
@@ -96,12 +145,40 @@ def run_cec(args, timeout=15):
         return False, str(e)
 
 
+def physical_address():
+    """Physical address of the adapter, or None if it cannot be read.
+
+    The address comes from the connected display's EDID, so it doubles
+    as a connection check: no display, no address."""
+    _, out = run_cec([])
+    for line in out.splitlines():
+        if "Physical Address" in line:
+            return line.split(":", 1)[1].strip()
+    return None
+
+
 def configure_cec():
     """Claim a logical address on the CEC bus.
 
     Without this cec-ctl refuses to transmit with "Adapter is
     unconfigured". The configuration does not survive a reboot, and it
-    can be lost if the adapter resets -- hence the retry in switch()."""
+    can be lost if the adapter resets -- hence the retry in switch().
+
+    A missing physical address is reported but not treated as fatal:
+    the cable may be reconnected later, and the service should recover
+    on its own rather than stay dead until someone notices."""
+    addr = physical_address()
+    if addr == INVALID_ADDRESS:
+        log.error(
+            "No display on %s (physical address %s). Check that the cable "
+            "sits in the CEC-capable HDMI input of the monitor and that "
+            "%s matches the Pi port in use.",
+            CEC_DEVICE, INVALID_ADDRESS, CEC_DEVICE,
+        )
+        return False
+    if addr:
+        log.info("Display detected on %s at %s", CEC_DEVICE, addr)
+
     ok, out = run_cec(["--playback", "--osd-name", CEC_OSD_NAME])
     if ok:
         log.info("CEC adapter configured on %s", CEC_DEVICE)
@@ -123,6 +200,21 @@ def switch(on):
 
     if ok:
         log.info("Panel %s", "on" if on else "standby")
+    elif UNREGISTERED in out:
+        log.warning(
+            "Panel %s sent without a logical address on %s -- no display "
+            "detected, check cable and port",
+            "on" if on else "standby", CEC_DEVICE,
+        )
+    elif NOT_ACKNOWLEDGED in out:
+        # The message left the Pi, nobody answered. Either the monitor
+        # is on an input without CEC, CEC is off in its OSD menu, or
+        # the cable moved.
+        log.warning(
+            "Panel %s not acknowledged on %s -- no CEC device answered "
+            "at address %s",
+            "on" if on else "standby", CEC_DEVICE, CEC_TARGET,
+        )
     else:
         log.warning("Switching failed: %s", out.strip()[:200])
     return ok

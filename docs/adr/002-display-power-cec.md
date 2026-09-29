@@ -17,7 +17,7 @@ headless output — for a display that switches dozens of times a day, not a usa
 ## Decision
 
 `scripts/presence.py` sends `cec-ctl --standby` / `--image-view-on` to the monitor (logical address 0)
-over HDMI-CEC on `/dev/cec1`. The Pi's output stays configured and enabled throughout; the monitor's
+over HDMI-CEC on `/dev/cec0`. The Pi's output stays configured and enabled throughout; the monitor's
 own controller handles standby.
 
 ## Alternatives considered
@@ -35,8 +35,16 @@ own controller handles standby.
   `Enabled: yes` before and after.
 - Waking takes 2–3 s — the monitor's own wake-up time, the same as pressing its power button.
 - CEC must be enabled in the monitor's OSD, and the user needs to be in the `video` group.
-- The Pi 4 exposes one CEC device per HDMI port. Addressing the wrong one fails with errno 64 (`ENONET`)
-  and no further hint; the device is configurable via `CEC_DEVICE`.
+- **Both ends of the cable are load-bearing.** The Pi 4 exposes one CEC device per HDMI port
+  (`/dev/cec0` for HDMI0, `/dev/cec1` for HDMI1), configurable via `CEC_DEVICE`; and the MSI PRO
+  MP273QW E14 carries CEC on its **HDMI 1** input only, a fact its manual states in one line of the
+  specification table. Moving the cable to the monitor's second input breaks display control while
+  the picture keeps working — see [`hardware.md`](../hardware.md#hdmi-wiring-and-cec).
+- **`cec-ctl` exits 0 even when nothing listened.** An unacknowledged transmit shows up as
+  `Not Acknowledged / Max Retries` in the output, and a transmit without a physical address as
+  `from Unregistered`, both with exit code 0. `presence.py` therefore parses the output and checks the
+  physical address (`f.f.f.f` means no display) instead of trusting the exit code. Before that fix the
+  service logged "Panel standby" while the mirror stayed lit.
 - The CEC adapter loses its logical address on reboot and occasionally on adapter reset.
   `presence.py` reconfigures and retries once when `cec-ctl` reports "unconfigured".
 - When the monitor renegotiates HDMI on wake, the rotation can be lost; `kanshi` reapplies it.
