@@ -56,6 +56,11 @@ gantt
 - **Phase 4 finished in CW 37**, a week ahead of the original CW 39 plan.
 - **The ADRs planned for each phase were written retrospectively, in CW 38**
   (`docs/adr/`).
+- **Display control was broken and repaired in CW 40.** Moving the HDMI cable
+  to the monitor's second input silenced CEC, because the MSI carries it on
+  input 1 only, and `presence.py` reported success anyway: `cec-ctl` exits 0
+  for an unacknowledged transmit. The script now parses the output and checks
+  the physical address, and the port moved to `/dev/cec0`.
 
 ---
 
@@ -170,7 +175,8 @@ survive a Pi reboot, and show content immediately at power-on.
 ## Phase 3 · Presence detection
 
 **CW 37–38 · ~25 h · hardware required**
-**Status:** done in CW 37
+**Status:** done in CW 37; display control repaired in CW 40, see
+[HDMI wiring and CEC](hardware.md#hdmi-wiring-and-cec)
 
 The display switches on when someone stands in front of the mirror, and off
 again after a hold time. The schedule from Phase 2 still acts as a frame:

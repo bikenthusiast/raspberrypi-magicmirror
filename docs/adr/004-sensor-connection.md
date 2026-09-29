@@ -32,7 +32,9 @@ service `presence.service`.
 
 ## Consequences
 
-- On/off is all the mirror needs, and a digital level is robust over the cable length.
+- On/off is all the mirror needs, and a digital level is robust over the cable length. Verified in
+  operation: `presence.service` reports "Presence detected" within a second of someone stepping in
+  front of the sensor.
 - No live distance data and no runtime reconfiguration from the Pi. Retuning zones means connecting the
   adapter again.
 - Debounce (0.5 s), a grace period before switching off (120 s) and a minimum gap between switches
