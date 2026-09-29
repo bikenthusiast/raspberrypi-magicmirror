@@ -874,18 +874,24 @@ journalctl -u presence -f
 > into standby; re-enabling then fails roughly half the time and each cycle
 > leaks another headless output.
 >
-> **Device node:** `/dev/cec1`, not `cec0`. The Pi 4 exposes one per HDMI port,
-> and the wrong one fails with `errno=64` and no further explanation.
->
-> Requires CEC enabled in the monitor's OSD.
+> **Device node:** `/dev/cec0` for HDMI0 (the inner socket, next to USB-C),
+> `/dev/cec1` for HDMI1. And on the monitor the cable belongs in **HDMI 1** —
+> the MSI carries CEC on that input only. Both are easy to get wrong and
+> neither fails loudly; see
+> [`hardware.md`](hardware.md#hdmi-wiring-and-cec).
 
-Manual check:
+Manual check — the adapter has to be registered once after every boot:
 
 ```bash
-cec-ctl -d /dev/cec1 --playback --osd-name "MagicMirror"
-cec-ctl -d /dev/cec1 --to 0 --standby
-cec-ctl -d /dev/cec1 --to 0 --image-view-on
+cec-ctl -d /dev/cec0 | grep "Physical Address"   # 1.0.0.0, not f.f.f.f
+cec-ctl -d /dev/cec0 --playback --osd-name "MagicMirror"
+cec-ctl -d /dev/cec0 -S                          # a TV at 0.0.0.0 must appear
+cec-ctl -d /dev/cec0 --to 0 --standby
+cec-ctl -d /dev/cec0 --to 0 --image-view-on
 ```
+
+Stop the service first (`sudo systemctl stop presence`), otherwise it switches
+the panel back on the next state change. Only one process can claim GPIO 27.
 
 ---
 
