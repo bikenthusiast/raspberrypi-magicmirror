@@ -24,6 +24,6 @@ MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control
 MMM-pages                   https://github.com/edward-shen/MMM-pages
 MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe
 MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast
-MMM-MyGCalendar             https://github.com/johnster000/MMM-MyGCalendar
+MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar d7db1d1
 MMM-OnSpotify               https://github.com/Fabrizz/MMM-OnSpotify
 MMM-LiveLyrics              https://github.com/Fabrizz/MMM-LiveLyrics
