@@ -90,6 +90,13 @@ Module.register("MMM-SpotifyPages", {
 		// until a LEAVE_HIDDEN_PAGE.
 		hiddenPageTimeoutMs: 120000,
 
+		// Name of the MMM-pages instance. Its animationTime decides how
+		// long a page transition keeps timers pending (see settle()).
+		pagesModule: "MMM-pages",
+
+		// Extra safety margin on top of MMM-pages' animationTime, in ms.
+		settleMarginMs: 200,
+
 		debug: false
 	},
 
@@ -104,6 +111,12 @@ Module.register("MMM-SpotifyPages", {
 		this.hiddenTimer = null;
 		this.switchTimer = null;
 		this.lastSwitch = 0;
+		this.hiddenName = null;
+		this.reassertTimer = null;
+
+		// Until this time, MMM-pages may still fire a pending show() from
+		// an earlier transition -- see settle().
+		this.settledAt = 0;
 
 		if (this.config.pollMs > 0) {
 			this.pollTimer = setInterval(
@@ -212,6 +225,41 @@ Module.register("MMM-SpotifyPages", {
 		}, this.config.idleRotationMs);
 	},
 
+	// --- Transition bookkeeping -----------------------------------------
+
+	/**
+	 * Duration of one MMM-pages transition in ms.
+	 *
+	 * MMM-pages hides the old modules over animationTime/2 and shows the
+	 * new ones with a setTimeout after animationTime/2. That timeout is
+	 * never cancelled: a second transition during this window does not
+	 * stop the first one from showing its modules afterwards. Whatever
+	 * was meant to be hidden by the second transition comes back.
+	 */
+	transitionMs () {
+		const mods = (typeof MM !== "undefined" && MM.getModules) ? MM.getModules() : [];
+		const pages = mods.find((m) => m.name === this.config.pagesModule);
+		const time = pages && pages.config && Number(pages.config.animationTime);
+		return Number.isFinite(time) && time >= 0 ? time : 1000;
+	},
+
+	/**
+	 * Call on every transition this module triggers or witnesses.
+	 * Afterwards, settledAt is the earliest time at which no MMM-pages
+	 * timer from that transition can fire any more.
+	 */
+	settle () {
+		const until = Date.now() + this.transitionMs() + (this.config.settleMarginMs || 0);
+		this.settledAt = Math.max(this.settledAt, until);
+	},
+
+	clearReassertTimer () {
+		if (this.reassertTimer) {
+			clearTimeout(this.reassertTimer);
+			this.reassertTimer = null;
+		}
+	},
+
 	// --- Page switching ------------------------------------------------
 
 	/**
@@ -228,14 +276,14 @@ Module.register("MMM-SpotifyPages", {
 			return;
 		}
 
+		const now = Date.now();
 		const gap = this.config.minSwitchGapMs || 0;
-		const since = Date.now() - this.lastSwitch;
+		const wait = Math.max(gap - (now - this.lastSwitch), this.settledAt - now, 0);
 
-		if (gap > 0 && since < gap) {
+		if (wait > 0) {
 			// A switch that's already waiting is discarded -- the most
 			// recently requested state always wins.
 			if (this.switchTimer) clearTimeout(this.switchTimer);
-			const wait = gap - since;
 			this.log(`page ${index} in ${wait} ms (animation still running)`);
 			this.switchTimer = setTimeout(() => {
 				this.switchTimer = null;
@@ -250,6 +298,7 @@ Module.register("MMM-SpotifyPages", {
 	emitPage (index) {
 		if (this.hiddenActive) return;
 		this.lastSwitch = Date.now();
+		this.settle();
 		// PAGE_SELECT replaces the deprecated PAGE_CHANGED.
 		// MMM-pages requires an actual integer, not a string.
 		this.sendNotification("PAGE_SELECT", index);
@@ -303,24 +352,61 @@ Module.register("MMM-SpotifyPages", {
 		this.clearHiddenTimer();
 		this.clearGrace();
 		this.clearSwitchTimer();
+		this.clearReassertTimer();
 		this.stopRotation();
 		this.hiddenActive = true;
+		this.hiddenName = pageName;
 		this.log(`hidden page "${pageName}" active -- control paused`);
+
+		// The page was opened while an earlier transition (typically the
+		// LEAVE of the same page a moment ago) still has a show() pending
+		// in MMM-pages. That show() would put the regular page back on
+		// top of the guest page. Ask MMM-pages again once it has settled;
+		// its transition then hides everything that is not on this page.
+		const now = Date.now();
+		if (now < this.settledAt) {
+			const wait = this.settledAt - now;
+			this.log(`re-asserting "${pageName}" in ${wait} ms`);
+			this.reassertTimer = setTimeout(() => {
+				this.reassertTimer = null;
+				if (!this.hiddenActive || this.hiddenName !== pageName) return;
+				this.settle();
+				this.sendNotification("SHOW_HIDDEN_PAGE", pageName);
+			}, wait);
+		}
+		this.settle();
 
 		if (this.config.hiddenPageTimeoutMs > 0) {
 			this.hiddenTimer = setTimeout(() => {
 				this.hiddenTimer = null;
 				this.log("time elapsed -- leaving hidden page");
 				this.sendNotification("LEAVE_HIDDEN_PAGE");
+				// MagicMirror never delivers a notification to its own
+				// sender, so this module would not see its LEAVE and
+				// would stay paused forever. Leave explicitly.
+				this.leaveHidden();
 			}, this.config.hiddenPageTimeoutMs);
 		}
 	},
 
 	leaveHidden () {
-		if (!this.hiddenActive) return;
+		if (!this.hiddenActive) {
+			// MMM-pages animates on every LEAVE_HIDDEN_PAGE, even a
+			// redundant one -- its pending show() counts all the same.
+			this.settle();
+			return;
+		}
 		this.clearHiddenTimer();
+		this.clearReassertTimer();
 		this.hiddenActive = false;
+		this.hiddenName = null;
 		this.log("hidden page left -- control active again");
+
+		// The page switch below is held back until MMM-pages has settled
+		// (goToPage waits for settledAt). If the hidden page was opened only
+		// a moment ago, its pending show() fires in between -- the delayed
+		// PAGE_SELECT then hides the guest page again.
+		this.settle();
 
 		// Re-determine the state instead of blindly resuming: playback
 		// may have started or ended while paused.
@@ -373,6 +459,7 @@ Module.register("MMM-SpotifyPages", {
 		this.clearGrace();
 		this.clearHiddenTimer();
 		this.clearSwitchTimer();
+		this.clearReassertTimer();
 		this.stopRotation();
 		if (this.pollTimer) clearInterval(this.pollTimer);
 	}
