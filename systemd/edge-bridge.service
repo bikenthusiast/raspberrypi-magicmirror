@@ -1,0 +1,45 @@
+# Edge bridge: pi-edge-ai gesture events -> guest Wi-Fi page.
+# See docs/adr/008-edge-event-bridge.md.
+#
+# Install:
+#   sudo apt install python3-paho-mqtt
+#   sudo install -d -m 750 -o root -g tobiask /etc/magicmirror
+#   sudo install -m 640 -o root -g tobiask config/edge-bridge.env.example \
+#        /etc/magicmirror/edge-bridge.env      # then fill in MQTT_PASSWORD
+#   sudo cp systemd/edge-bridge.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now edge-bridge
+#
+# Watch:
+#   journalctl -u edge-bridge -f
+
+[Unit]
+Description=MagicMirror edge bridge (MQTT gestures -> hidden page)
+
+# The broker runs on this Pi (pi-edge-ai, ADR 0003). Wants, not Requires:
+# if mosquitto restarts, the bridge reconnects on its own instead of being
+# stopped with it.
+After=network-online.target mosquitto.service
+Wants=network-online.target mosquitto.service
+
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+# guest-page.sh reads remoteApiKey from config/secrets.js, which belongs to
+# this user -- the bridge runs as the same user, not as root.
+User=tobiask
+ExecStart=/usr/bin/python3 /home/tobiask/Projects/raspberrypi-magicmirror/scripts/edge_bridge.py
+
+# MQTT_PASSWORD and friends. Outside the repo, readable by root and tobiask.
+EnvironmentFile=/etc/magicmirror/edge-bridge.env
+
+Restart=on-failure
+RestartSec=10
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
