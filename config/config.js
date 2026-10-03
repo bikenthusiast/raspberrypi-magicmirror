@@ -103,7 +103,7 @@ let config = {
 				useAnimatedIcons: true,
 				forecastLayout: "table",
 				updateInterval: 10, // minutes
-				label_timeFormat: "HH:MM",
+				label_timeFormat: "HH [Uhr]",
 				// German labels
 				label_days: ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
 				label_high: "H",
@@ -153,10 +153,26 @@ let config = {
 				calendars: [
 					{
 						name: "Personal",
-						url: s.calendarUrl,
+						url: s.calendarUrlpersonal,
+						color: "#0B8043"
+					},
+					{
+						name: "Claude (Aufgaben)",
+						url: s.calenderUrlclaude,
 						color: "#4285F4"
+					},
+					{
+						name: "Sport",
+						url: s.calendarUrlSport,
+						color: "#F4511E"
 					}
 				],
+				locale: "de-DE",
+				showTodayPanel: true,
+				todayPanelWidth: "300px",
+				todayPanelTitle: "Heute",
+				todayPanelEmptyText: "Keine Termine heute",
+				allDayText: "Ganztägig",
 				weekStartsOnMonday: true,
 				backgroundColor: "#616161",
 				// Keyword (regex) → Google Calendar colour
