@@ -12,5 +12,7 @@ new record that supersedes the old one.
 | [004](004-sensor-connection.md) | Radar on a GPIO input, UART not connected in operation | Accepted |
 | [005](005-power-management.md) | Witty Pi 4 Mini for the night, CEC standby during the day | Accepted |
 | [006](006-secrets-handling.md) | Credentials in a git-ignored `secrets.js`, guarded by a pre-commit hook | Accepted |
+| 007 | Gesture sensor: DFRobot SEN0628 on UART5, no camera | planned |
+| [008](008-edge-event-bridge.md) | Gesture events from pi-edge-ai reach the mirror through a Python bridge service | Proposed |
 
 Template for new records: [`000-template.md`](000-template.md).
