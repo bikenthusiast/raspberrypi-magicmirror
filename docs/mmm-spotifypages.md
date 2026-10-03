@@ -68,6 +68,34 @@ kept. Background: [`troubleshooting-spotifypages.md`](troubleshooting-spotifypag
 
 ---
 
+## Why hidden-page transitions wait for MMM-pages to settle
+
+`MMM-pages` animates every change — `PAGE_SELECT`, `SHOW_HIDDEN_PAGE`, `LEAVE_HIDDEN_PAGE` — the same
+way: hide everything that does not belong to the target at once, then **show the target's modules in a
+`setTimeout` after `animationTime / 2`** (500 ms by default). That timeout is never cancelled. A second
+change inside the window cannot stop the first one from showing its modules afterwards, and the
+`show()` with `MMM-pages`' lock string removes the lock the second change had just set.
+
+Seen on 03.10.2026: a guest page opened and closed within a fraction of a second left the QR code
+visible behind the calendar. The reverse (close, then reopen quickly) leaves the calendar on top of
+the QR code.
+
+The controller therefore tracks `settledAt` — the time after which no `MMM-pages` timer from a known
+transition can fire (`animationTime + settleMarginMs` after the last one) — and re-asserts the
+intended state once that time has passed:
+
+| Sequence | What would go wrong | What the controller does |
+|---|---|---|
+| show → hide quickly | pending show of the guest page fires after the hide | the page switch after leaving waits for `settledAt`; that `PAGE_SELECT` hides the guest page again |
+| hide → show quickly | pending show of the regular page fires over the guest page | sends `SHOW_HIDDEN_PAGE` once more at `settledAt`, which hides the regular page again |
+| any `LEAVE_HIDDEN_PAGE`, even a redundant one | `MMM-pages` animates regardless | counted as a transition |
+
+The cleaner fix belongs in `MMM-pages` itself (keep the timeout handle, `clearTimeout` it at the start of
+every transition). The re-assertion stays correct with that fix in place; it then simply does nothing
+visible.
+
+---
+
 ## Configuration
 
 | Option | Default | Used here | Meaning |
@@ -81,6 +109,8 @@ kept. Background: [`troubleshooting-spotifypages.md`](troubleshooting-spotifypag
 | `respectHiddenPages` | `true` | default | Stay out of the way while a hidden page is open |
 | `minSwitchGapMs` | `700` | default | Minimum time between two page switches |
 | `hiddenPageTimeoutMs` | `120000` | `60000` | Close a hidden page automatically; `0` disables |
+| `pagesModule` | `"MMM-pages"` | default | Module whose `animationTime` defines a transition |
+| `settleMarginMs` | `200` | default | Safety margin added to `animationTime` before re-asserting |
 | `debug` | `false` | `false` | Log every decision via `Log.info` |
 
 `MMM-pages` must have its own rotation switched off, otherwise its timer overrides this module:
@@ -106,3 +136,22 @@ kept. Background: [`troubleshooting-spotifypages.md`](troubleshooting-spotifypag
   ignores string indices.
 - **Last guard in `emitPage()`.** Even timers that were scheduled before a hidden page opened cannot
   send a switch while it is open.
+- **Own notifications never come back.** MagicMirror does not deliver a notification to its sender.
+  When `hiddenPageTimeoutMs` expires, the controller sends `LEAVE_HIDDEN_PAGE` *and* calls
+  `leaveHidden()` itself — before 03.10.2026 it only sent the notification and stayed paused, so
+  rotation and the Spotify page stopped working after every automatic timeout.
+
+---
+
+## Tests
+
+`tests/js/` runs the real `MMM-SpotifyPages` and the real `MMM-pages` against a minimal stand-in for
+MagicMirror's core (notification delivery, `hide()`/`show()` with lock strings) and drives time with
+`node:test` mock timers. No dependencies.
+
+```bash
+node --test tests/js/*.test.js
+# MMM-pages elsewhere:  MMM_PAGES=/path/to/MMM-pages.js node --test tests/js/*.test.js
+```
+
+Without an `MMM-pages` installation the tests are skipped.

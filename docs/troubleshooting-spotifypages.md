@@ -73,6 +73,35 @@ animation duration, and it may exceed 700 ms.
 
 ---
 
+## Guest page stays visible behind the calendar
+
+### Symptom
+
+After opening and closing the guest Wi-Fi page in quick succession (two gestures, or
+`guest-page.sh show; guest-page.sh hide`), the regular page is back but the QR code is still shown
+with it. Closing and quickly reopening gives the reverse: the calendar sits on top of the QR code.
+
+### Cause
+
+Same family as the blank screen above. `MMM-pages` shows the modules of every transition in a
+`setTimeout` after `animationTime / 2` and never cancels it. The `show()` of the first transition fires
+after the second one has hidden those modules, and removes the lock the second one set.
+
+### Fix
+
+`MMM-SpotifyPages` (03.10.2026) waits for `MMM-pages` to settle and then re-asserts the intended page —
+see [Why hidden-page transitions wait](mmm-spotifypages.md#why-hidden-page-transitions-wait-for-mmm-pages-to-settle).
+Check the deployed version:
+
+```bash
+grep -c "settledAt" ~/Projects/MagicMirror/modules/MMM-SpotifyPages/MMM-SpotifyPages.js
+```
+
+`0` means the old version is still in place. Recovery without a restart: send the intended state once
+more, e.g. `./scripts/guest-page.sh hide`.
+
+---
+
 ## Spotify playback no longer detected after several hours
 
 ### Symptom
