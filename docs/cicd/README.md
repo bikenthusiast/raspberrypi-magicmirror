@@ -1,7 +1,7 @@
 # CI/CD
 
 How a change gets from a commit to the wall, and what checks it on the way. The reasoning is in
-[ADR-009](../adr/009-pull-based-deployment.md).
+[ADR-009](../adr/009-pull-based-deployment.md). Versions and releases: [releasing.md](releasing.md).
 
 ```mermaid
 flowchart LR

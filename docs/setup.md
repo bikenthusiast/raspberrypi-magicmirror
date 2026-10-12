@@ -374,7 +374,7 @@ nano config/secrets.js
 |---|---|
 | `remoteApiKey` | `openssl rand -hex 16` |
 | `guestWifiSsid`, `guestWifiPass` | FRITZ!Box → WLAN → guest access |
-| `calendarUrl` | Google Calendar → settings → private iCal address |
+| `calendarUrlpersonal`, `calenderUrlclaude`, `calendarUrlSport`, `calendarUrlCulture` | Google Calendar → settings → private iCal address, one per calendar |
 | `spotifyClientId`, `spotifyClientSecret` | developer.spotify.com/dashboard |
 | `spotifyAccessToken`, `spotifyRefreshToken` | authorisation flow, below |
 | `geniusAccessToken` | genius.com/api-clients |

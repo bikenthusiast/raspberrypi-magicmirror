@@ -1,7 +1,7 @@
 # raspberrypi-magicmirror
 
 A wall-mounted smart mirror built on MagicMirror², running on a Raspberry Pi 4B behind two-way mirror glass.
-What makes it more than a dashboard is that the display reacts to state instead of rotating on a timer: it switches to the now-playing page by itself when music starts, holds a guest Wi-Fi page on request without disturbing the rotation, and puts the panel into standby when nobody is in front of it.
+What makes it more than a dashboard is that the display reacts to state instead of rotating on a timer: it switches to the now-playing page by itself when music starts, holds a guest Wi-Fi page on request without disturbing the rotation — opened with a hand swipe, recognised by a time-of-flight sensor instead of a camera — and puts the panel into standby when nobody is in front of it.
 
 <p align="center">
   <img src="docs/demo/gif/demo_magicmirror_rot.gif" alt="The mirror switching from the idle page to the now-playing page when a song starts, then to the guest Wi-Fi page" width="420">
@@ -35,6 +35,10 @@ locked and invisible. Details: [`docs/mmm-spotifypages.md`](docs/mmm-spotifypage
 
 Independently of MagicMirror, a 24 GHz mmWave radar puts the monitor into standby over HDMI-CEC after two
 minutes without presence, and a Witty Pi 4 Mini powers the Pi down at night.
+
+A swipe in front of the mirror opens and closes the guest page. The sensor is a DFRobot SEN0628, an 8×8
+time-of-flight sensor that measures distances only — no image of anyone passing by is ever taken
+([ADR-007](docs/adr/007-gesture-sensor.md), [`docs/sen0628.md`](docs/sen0628.md)).
 
 ---
 
@@ -129,6 +133,8 @@ The script reads the API key from `config/secrets.js` and calls MMM-Remote-Contr
 | [`docs/roadmap.md`](docs/roadmap.md) | Phases, status and what changed against the plan |
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
 | [`docs/cicd/`](docs/cicd/) | CI checks, CI-gated pull deployment on the Pi |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each version |
+| [`docs/upgrading-to-2.0.md`](docs/upgrading-to-2.0.md) | Upgrade steps from 1.0 |
 | [`docs/mmm-spotifypages.md`](docs/mmm-spotifypages.md) | The page controller in detail |
 | [`docs/logging.md`](docs/logging.md) | Journal setup and log troubleshooting |
 | [`docs/troubleshooting-spotifypages.md`](docs/troubleshooting-spotifypages.md) | Page locks and the Spotify token refresh loop |

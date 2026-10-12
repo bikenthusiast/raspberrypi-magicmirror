@@ -1,6 +1,6 @@
 # Roadmap
 
-Extension phases for the mirror after the software base is complete. Status as of CW 38 / 2026.
+Extension phases for the mirror after the software base is complete. Status as of CW 42 / 2026 (release 2.0.0).
 
 **Planning basis:** 4 h/day, 5 days a week, so roughly 20 h per week. With seven
 working days, the plan compresses by about a third.
@@ -11,7 +11,7 @@ working days, the plan compresses by about a third.
 | [2 · Display schedule](#phase-2--display-schedule) | 36 | ~10 h | Display off at night | ↪ Superseded — see ADR-002 / ADR-005 |
 | [3 · Presence detection](#phase-3--presence-detection) | 37–38 | ~25 h | Radar switches the display | ✅ Done |
 | [4 · Hard shutdown](#phase-4--hard-shutdown) | 39 | ~14 h | Pi shuts down and wakes up | ✅ Done (ahead of plan) |
-| [5 · Gestures](#phase-5--gesture-control) | 40–42 | ~45 h | Modules switched by hand gesture | ⏳ Next |
+| [5 · Gestures](#phase-5--gesture-control) | 40–42 | ~45 h | Modules switched by hand gesture | 🟡 5a done (rule-based, close range) · trained model in progress |
 
 ```mermaid
 gantt
@@ -422,15 +422,34 @@ back at any time.
 
 ## Phase 5 · Gesture control
 
-**CW 40–42 · ~45 h · camera required**
-**Status:** next — starts CW 40
+**CW 40–42 · ~45 h · ~~camera required~~ camera-free ToF sensor ([ADR-007](adr/007-gesture-sensor.md))**
+**Status:** 5a done in CW 41/42 — swipe left/right shows/hides the guest page, released as 2.0.0.
+Recognition at the target distance (60–80 cm) is the open part; see *Status CW 42* below.
 
 Hand signals in front of the mirror show and hide modules — the guest QR
 code from Phase 1 is the first use case.
 
 This phase is the bridge to the sister project
 [`pi-edge-ai`](https://github.com/bikenthusiast/pi-edge-ai): inference
-on-device, result sent to the mirror over HTTP.
+on-device, result sent to the mirror over MQTT ([ADR-008](adr/008-edge-event-bridge.md)).
+
+### Status CW 42
+
+The camera plan was dropped for privacy: the mirror hangs in a hallway. Instead a DFRobot SEN0628
+(8×8 time-of-flight, no image data) runs on UART5 ([ADR-007](adr/007-gesture-sensor.md),
+[sen0628.md](sen0628.md)).
+
+| Step | Status |
+|---|---|
+| Sensor commissioned on UART5, 4×4 mode, frame rate measured | done |
+| Recording tools, labelled sessions (`tof_record.py`, `--capture`) | done |
+| Rule-based detector `gesture.py`, `gesture.service`, trigger via `guest-page.sh` | done — reliable at 15–35 cm |
+| Regression tests on recorded takes, CI | done |
+| Target distance 60–80 cm | rule recognises ~1 in 5 swipes; training data being collected (≥ 5 sessions) |
+| Trained model in pi-edge-ai, delivered over the edge bridge | in progress — planned as 2.1.0 |
+| Sensor in the frame (open cut-out, shared cable) | open |
+
+The original task list below is kept for reference.
 
 ### Tasks
 
@@ -458,10 +477,11 @@ Measure first, then buy.
 
 | Artifact | Location |
 |---|---|
-| `gesture.py` with debouncer | `scripts/` |
-| Benchmark results | `docs/benchmarks.md` |
-| ADR: gesture selection and debouncing | `adr/007-gesture-recognition.md` (planned) |
-| Camera mount | `docs/hardware.md` |
+| `gesture.py` with debouncer (lockout) | `scripts/` — done |
+| Sensor driver, recording and benchmark tools | `scripts/sen0628.py`, `scripts/tof_*.py` — done |
+| Measurements and results | [`sen0628.md`](sen0628.md) — done |
+| ADR: gesture sensor | [`adr/007-gesture-sensor.md`](adr/007-gesture-sensor.md) — done |
+| Sensor mount in the frame | `docs/hardware.md` — open |
 
 ### Completion criterion
 
@@ -481,7 +501,7 @@ Two dependencies run in both directions:
 
 - Phase 3 determines where in the frame the sensor pocket sits — the frame
   shouldn't be permanently closed up before that
-- Phase 5 determines the camera position
+- Phase 5 needs an open cut-out for the ToF sensor in the bottom rail (no camera any more)
 
 Build details in [`hardware.md`](hardware.md).
 
@@ -496,5 +516,6 @@ Build details in [`hardware.md`](hardware.md).
 | ~~Pin conflict: HAT vs. radar~~ | — | **resolved**: no overlap, TXD stays unwired | Resolved |
 | ~~Witty Pi software on Trixie~~ | Phase 4 blocked | test immediately after delivery, not only in CW 39 | Resolved |
 | 1-Wire active on GPIO 4 | Pi shuts down after every boot | disable in raspi-config before mounting | Verified off |
-| CPU not enough for gestures | Phase 5 stalls | lower frame rate, then accelerator | Open |
+| ~~CPU not enough for gestures~~ | Phase 5 stalls | no camera: ToF frames are 16 distances | Resolved — ADR-007 |
+| ToF range too short at 60–80 cm | gestures unreliable at the target distance | trained model (pi-edge-ai); radar as phase 5b | Open |
 | Radar dampened through two-way mirror glass | sensor detects nothing | sensor pocket in the bottom frame rail — verify at installation | Open |
