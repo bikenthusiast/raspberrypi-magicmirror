@@ -8,9 +8,14 @@ module.exports = {
 	guestWifiPass: "",
 	guestWifiType: "WPA",        // "nopass" for an open network
 
-	// Google Calendar -> settings -> private address in iCal format.
-	// Contains a token granting full read access without a login.
-	calendarUrl: "",
+	// Google Calendar -> settings -> private address in iCal format, one per
+	// calendar shown in MMM-MyGCalendar. Each contains a token granting full
+	// read access without a login. Key names as used in config.js -- note
+	// "calender" in the second one.
+	calendarUrlpersonal: "",
+	calenderUrlclaude: "",
+	calendarUrlSport: "",
+	calendarUrlCulture: "",
 
 	// developer.spotify.com/dashboard
 	// Redirect URI must be http://127.0.0.1:8888/callback --

@@ -22,7 +22,12 @@ Then add to `/boot/firmware/config.txt`:
 ```
 dtoverlay=disable-bt
 enable_uart=1
+dtoverlay=uart5
 ```
+
+`uart5` adds a second UART on GPIO 12 (TXD5) and GPIO 13 (RXD5) for the gesture
+sensor, `/dev/ttyAMA5`. GPIO 14/15 stay reserved: the Witty Pi monitors TXD
+([ADR-004](adr/004-sensor-connection.md), [ADR-007](adr/007-gesture-sensor.md)).
 
 `disable-bt` moves the stable PL011 UART from Bluetooth onto GPIO 14/15.
 Without it, that pin pair carries the mini-UART instead, whose baud rate
@@ -36,6 +41,7 @@ Then reboot.
 
 ```bash
 ls -l /dev/serial*                 # serial0 -> ttyAMA0 expected
+pinctrl get 12,13                  # a4 ... TXD5 / RXD5 expected
 sudo raspi-config nonint get_i2c   # 0 = enabled
 i2cdetect -y 1                     # empty as long as no Witty Pi is attached
 grep -n "w1-gpio" /boot/firmware/config.txt   # must stay empty
@@ -71,9 +77,9 @@ dtoverlay=w1-gpio,gpiopin=18
 | Presence sensor | Waveshare HMMD mmWave (S3KM1110) | Presence detection | installed, OT2 on GPIO 27 |
 | Display | MSI PRO MP273QW E14, 27″ 16:9, 2560×1440, portrait | Display | in use |
 | Spy mirror glass | VSG laminated safety glass, 6 mm, 12 % transmission, 614 × 366 mm | Mirror surface | specified |
-| Fan | 2-wire, on pin 1 and 6 | Cooling | installed |
+| Fan | 2-wire, on pin 4 (5 V) and 6 | Cooling | installed |
 | USB-TTL adapter | Waveshare FT232, USB-C | Radar sensor configuration | available |
-| Camera | USB webcam 1080p | Gesture recognition, phase 5 | open |
+| Gesture sensor | DFRobot SEN0628 (VL53L7CX + RP2040), 8×8 time-of-flight | Gesture recognition, phase 5 | commissioned on the bench, UART5 — see [sen0628.md](sen0628.md), [ADR-007](adr/007-gesture-sensor.md) |
 
 > [!NOTE]
 > Glass and frame specifications: see drawing SM-001.
@@ -104,8 +110,9 @@ State: all components mounted.
 
 | Pi pin | Signal | Used by | Purpose |
 |---|---|---|---|
-| 1 | 3V3 | **Fan** | Power |
+| 1 | 3V3 | **ToF sensor** (bench) | Power |
 | 3 | GPIO 2 (SDA1) | Witty Pi | I2C to MCU |
+| 4 | 5V | **Fan** | Power |
 | 5 | GPIO 3 (SCL1) | Witty Pi | I2C to MCU |
 | 6 | GND | **Fan** | Ground |
 | 7 | GPIO 4 | Witty Pi | Button / shutdown signal |
@@ -114,12 +121,18 @@ State: all components mounted.
 | 11 | GPIO 17 | Witty Pi | SYS_UP signal |
 | 13 | GPIO 27 | **Radar** | Presence digital (OT2) |
 | 17 | 3V3 | **Radar** | Power |
+| 32 | GPIO 12 (TXD5) | **ToF sensor** | UART5 to sensor RX (C/R) |
+| 33 | GPIO 13 (RXD5) | **ToF sensor** | UART5 from sensor TX (D/T) |
+| 34 | GND | **ToF sensor** | Ground |
 
-All remaining pins are free.
+All remaining pins are free. The ToF sensor's 3.3 V comes from pin 1 on the
+bench; in the frame it moves to the shared cable with the radar (pin 17).
+Wiring, protocol and measurements: [sen0628.md](sen0628.md).
 
 ### Why radar isn't on pin 1 and 6
 
-The fan already occupies pin 1 (3V3) and pin 6 (GND). Both signals appear
+When the radar was wired, the fan occupied pin 1 (3V3) and pin 6 (GND); it has
+since moved to pin 4 (5 V). Both signals appear
 multiple times on the header, so the radar sensor uses different ones:
 
 | Sensor | Pin | instead of |
@@ -133,11 +146,10 @@ and 17, ground on pins 6, 9, 14, 20, 25, 30, 34, and 39.
 
 > [!NOTE]
 > The Pi's 3.3 V rail has a lower current capacity than the 5 V rail —
-> typically a few hundred milliamps total for all loads combined. The fan and
-> radar sensor share it. If the sensor later drops out or behaves oddly, the
-> power supply is the first suspect. The fan could then be moved to pin 4
-> (5 V), relieving the 3.3 V rail — though it would run faster and louder
-> there.
+> typically a few hundred milliamps total for all loads combined. The radar
+> and the ToF sensor (< 80 mA) share it; the fan has moved to pin 4 (5 V) to
+> relieve it. If a sensor drops out or behaves oddly, the power supply is the
+> first suspect.
 
 ### GPIO 27 instead of GPIO 17
 
@@ -165,7 +177,7 @@ obvious GPIO 17: the latter is used by the Witty Pi for the SYS_UP signal.
 
 | Sensor | Pi pin | GPIO | Function |
 |---|---|---|---|
-| 3V3 | **17** | — | 3.3 V (pin 1 is used by the fan) |
+| 3V3 | **17** | — | 3.3 V (pin 1 is used by the ToF sensor on the bench) |
 | GND | **9** | — | Ground (pin 6 is used by the fan) |
 | OT2 | **13** | GPIO 27 | Presence high/low |
 | TX | — | ~~GPIO 15 (RXD)~~ | not needed, see below |
@@ -412,4 +424,6 @@ position is finalized.
 | Presence detection in operation | **done** — `presence.service` enabled and running, GPIO 27 switches reliably |
 | CEC port and monitor input | **done** — `/dev/cec0`, monitor input HDMI 1, see [HDMI wiring and CEC](#hdmi-wiring-and-cec) |
 | Adjust sensitivity zones | only meaningful at the installation location |
-| CPU headroom for gesture recognition | open, measure before phase 5 |
+| CPU headroom for gesture recognition | **not needed** — no camera; the sensor delivers 16 distances per frame ([ADR-007](adr/007-gesture-sensor.md)) |
+| ToF sensor frame rate | **done** — 8×8 7.4 fps, 4×4 17–25 fps; gestures use 4×4, see [sen0628.md](sen0628.md) |
+| ToF sensor in the frame | open — open cut-out in the bottom rail (the mirror coating reflects 940 nm), shared frame cable |
