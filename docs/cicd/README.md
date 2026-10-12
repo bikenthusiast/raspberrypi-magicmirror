@@ -8,7 +8,7 @@ flowchart LR
   DEV["Mac<br/>branch + PR"] -->|push| GH["GitHub"]
   GH --> CI["GitHub Actions<br/>secrets · shell · python · javascript"]
   CI -->|"green → merge to main<br/>(branch protection)"| MAIN["main"]
-  PI["Pi<br/>deploy.timer, every 30 min"] -->|"1 fetch"| MAIN
+  PI["Pi<br/>deploy.timer, daily 09:00"] -->|"1 fetch"| MAIN
   PI -->|"2 check runs green?"| CI
   PI -->|"3 fast-forward, restart what changed<br/>4 smoke test, roll back on failure"| SVC["magicmirror · presence · edge-bridge"]
 ```
@@ -54,8 +54,9 @@ The check names appear in the list only after the workflow has run once, e.g. on
 
 ### How a deployment runs
 
-`scripts/deploy.sh`, started by the user timer `deploy.timer` at :00 and :30 between 08:00 and 21:30
-(the Witty Pi window, ADR-005):
+`scripts/deploy.sh`, started by the user timer `deploy.timer` once a day at 09:00 (inside the Witty Pi
+window, ADR-005; a run missed while the Pi was off happens right after the next start). A merge to
+`main` therefore reaches the wall the next morning — or at once with `systemctl --user start deploy`:
 
 1. **Preconditions:** the checked-out branch is `main` and there are no local changes to tracked
    files. Otherwise it logs why and stops.
@@ -130,6 +131,8 @@ a login.
 ```bash
 journalctl --user -u deploy -n 50                 # what the last runs did
 journalctl --user -u deploy --since today | grep -E "deployed|rolled back|MANUAL"
+systemctl --user list-timers deploy.timer         # next and last run (NEXT / LAST)
+systemctl --user status deploy.timer              # same, plus "Trigger:" line
 systemctl --user start deploy                      # deploy now instead of waiting
 rm ~/.local/state/mirror-deploy/failed-commit      # retry a commit that failed the smoke test
 systemctl --user disable --now deploy.timer        # pause deployments (e.g. while recording sensor data)
