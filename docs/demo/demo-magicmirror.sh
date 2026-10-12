@@ -14,8 +14,10 @@ OUT="$DEMO_DIR/demo_$(date +%F_%H-%M).mp4"
 
 mkdir -p "$DEMO_DIR"
 
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-export WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9] | head -1)")"
+XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export XDG_RUNTIME_DIR
+WAYLAND_DISPLAY="$(basename "$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9] | head -1)")"
+export WAYLAND_DISPLAY
 
 # --- API-Key lesen und pruefen -----------------------------------------
 # Schluesselnamen an die eigene secrets.js anpassen!

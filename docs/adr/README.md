@@ -14,5 +14,6 @@ new record that supersedes the old one.
 | [006](006-secrets-handling.md) | Credentials in a git-ignored `secrets.js`, guarded by a pre-commit hook | Accepted |
 | 007 | Gesture sensor: DFRobot SEN0628 on UART5, no camera | planned |
 | [008](008-edge-event-bridge.md) | Gesture events from pi-edge-ai reach the mirror through a Python bridge service | Proposed |
+| [009](009-pull-based-deployment.md) | CI on GitHub Actions, deployment pulled by the Pi and gated on green CI | Proposed |
 
 Template for new records: [`000-template.md`](000-template.md).

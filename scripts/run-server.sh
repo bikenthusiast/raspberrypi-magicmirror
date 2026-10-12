@@ -66,5 +66,5 @@ trap finish EXIT
 echo "Logging to: $RUNNING"
 echo
 
-cd "$MM_ROOT"
+cd "$MM_ROOT" || exit 1
 node --run server 2>&1 | tee "$RUNNING"
