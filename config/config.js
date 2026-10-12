@@ -81,7 +81,7 @@ let config = {
 				timeToWalk: 0,
 				showWalkingTime: false,
 				showTrainDepartureTime: true,
-				trainDepartureTimeFormat: "relative",
+				trainDepartureTimeFormat: "absolute",
 				walkingTimeFormat: "relative",
 				showInterruptions: true, // interrupted rows are greyed out
 				showInterruptionsDetails: false,
@@ -165,6 +165,12 @@ let config = {
 						name: "Sport",
 						url: s.calendarUrlSport,
 						color: "#F4511E"
+					},
+					
+					{
+						name: "Kultur",
+						url: s.calendarUrlCulture,
+						color: "#f4db1e92"
 					}
 				],
 				locale: "de-DE",
