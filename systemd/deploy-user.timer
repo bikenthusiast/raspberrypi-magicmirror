@@ -1,14 +1,20 @@
-# Every 30 minutes while the mirror is in use. The Witty Pi powers the Pi
-# from 07:30 to 22:15 (ADR-005); deployments stay inside that window and
-# away from the boot itself.
+# Once a day at 09:00. The Witty Pi powers the Pi from 07:30 to 22:15
+# (ADR-005), so 09:00 is after the morning routine at the mirror and leaves
+# the rest of the day to notice a deployment that went wrong.
+#
+# Persistent=true: if the Pi was off at 09:00, the run happens right after
+# the next start instead of being skipped for a day.
+#
+# Deploy immediately, regardless of the timer:  systemctl --user start deploy
+# Next run:                                     systemctl --user list-timers deploy.timer
 
 [Unit]
-Description=Check for a new CI-green commit every 30 minutes
+Description=Check once a day for a new CI-green commit
 
 [Timer]
-OnCalendar=*-*-* 08..21:00,30
+OnCalendar=*-*-* 09:00
 RandomizedDelaySec=120
-Persistent=false
+Persistent=true
 
 [Install]
 WantedBy=timers.target

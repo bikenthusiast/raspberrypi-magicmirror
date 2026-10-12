@@ -23,8 +23,8 @@ the hidden-page race, shell scripts that have broken on quoting before.
 shellcheck, ruff and pytest, and JavaScript syntax, config loading and module tests. `main` is
 protected and only accepts merges with green checks.
 
-**CD** is pulled, not pushed: a systemd user timer on the Pi runs `scripts/deploy.sh` every 30 minutes
-during operating hours. It fast-forwards to `origin/main` only if every GitHub check run for that exact
+**CD** is pulled, not pushed: a systemd user timer on the Pi runs `scripts/deploy.sh` once a day at
+09:00, inside the Witty Pi's operating hours; `systemctl --user start deploy` deploys on demand. It fast-forwards to `origin/main` only if every GitHub check run for that exact
 commit succeeded. It restarts only the services whose files changed and smoke-tests them. On failure it
 resets to the previous commit and remembers the failed one, so it does not retry the same commit.
 
@@ -36,12 +36,12 @@ resets to the previous commit and remembers the failed one, so it does not retry
 | Push from Actions over SSH (port forward or Tailscale) | Needs an SSH key for the Pi as a GitHub secret and an inbound path to the home network. More attack surface than the problem warrants |
 | `ansible-pull` / container images with Watchtower | Mature tools, but they bring a second configuration system or a container runtime to a single device whose services are plain systemd units |
 | Keep deploying by hand | Works, but nothing stops an untested commit, and restarts depend on remembering which service a file belongs to |
-| Deploy without the CI gate (`git pull` on a timer) | Any commit on main would reach the wall within 30 minutes, including one that failed CI |
+| Deploy without the CI gate (`git pull` on a timer) | Any commit on main would reach the wall at the next run, including one that failed CI |
 
 ## Consequences
 
 - No inbound connection, no GitHub credentials on the Pi, no Pi credentials on GitHub. The Pi reads the
-  public check-runs API anonymously (60 requests per hour; the timer needs at most 2).
+  public check-runs API anonymously (60 requests per hour; the timer needs one a day).
 - The Pi becomes a deploy target. Local edits to tracked files make `deploy.sh` skip the run
   instead of overwriting them. Development happens on the Mac or a branch.
 - The mapping from changed paths to restarts lives in one function (`actions_for`) and can be checked
