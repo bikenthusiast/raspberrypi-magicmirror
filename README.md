@@ -60,6 +60,7 @@ Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr/).
 | Display server | Wayland with the labwc compositor; `kanshi` for persistent rotation |
 | Application | MagicMirror² 2.37 under Electron |
 | Process management | systemd **user** service, logging to the journal |
+| CI/CD | GitHub Actions; the Pi pulls CI-green commits from `main` ([ADR-009](docs/adr/009-pull-based-deployment.md)) |
 | Display power | HDMI-CEC via `/dev/cec0`, driven by the presence sensor ([ADR-002](docs/adr/002-display-power-cec.md)) |
 | Power schedule | Witty Pi 4 Mini, on 07:30 / off 22:15 ([ADR-005](docs/adr/005-power-management.md)) |
 
@@ -127,6 +128,7 @@ The script reads the API key from `config/secrets.js` and calls MMM-Remote-Contr
 | [`docs/hardware.md`](docs/hardware.md) | Components, GPIO assignment, wiring, frame |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phases, status and what changed against the plan |
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
+| [`docs/cicd/`](docs/cicd/) | CI checks, CI-gated pull deployment on the Pi |
 | [`docs/mmm-spotifypages.md`](docs/mmm-spotifypages.md) | The page controller in detail |
 | [`docs/logging.md`](docs/logging.md) | Journal setup and log troubleshooting |
 | [`docs/troubleshooting-spotifypages.md`](docs/troubleshooting-spotifypages.md) | Page locks and the Spotify token refresh loop |

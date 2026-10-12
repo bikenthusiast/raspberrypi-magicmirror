@@ -1,0 +1,86 @@
+# CI for the mirror repository -- see docs/cicd/README.md and ADR-009.
+#
+# Every job here is a gate for deployment: scripts/deploy.sh on the Pi only
+# pulls a commit whose check runs are all green.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # gitleaks scans the commits of the push, not just the tree
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  shell:
+    name: shell (shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -S warning scripts/*.sh .githooks/pre-commit docs/demo/*.sh
+
+  python:
+    name: python (ruff + pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"   # Raspberry Pi OS Trixie
+      - run: pip install ruff pytest
+      - name: ruff
+        run: ruff check --select E,F,W,B --line-length 120 scripts tests
+      - name: pytest
+        run: python -m pytest -q tests
+
+  javascript:
+    name: javascript (syntax, config, module tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"       # NodeSource 24.x on the Pi (docs/setup.md)
+      - name: syntax
+        run: |
+          for f in modules/*/*.js config/*.js tests/js/*.js; do
+            node --check "$f"
+          done
+      - name: config loads with the example secrets
+        # config.js reads secrets from ~/Projects/raspberrypi-magicmirror/config/ (ADR-006)
+        run: |
+          mkdir -p ~/Projects/raspberrypi-magicmirror/config
+          cp config/secrets.example.js ~/Projects/raspberrypi-magicmirror/config/secrets.js
+          node -e "const c = require('./config/config.js');
+                   if (!Array.isArray(c.modules) || c.modules.length === 0) process.exit(1);
+                   console.log(c.modules.length + ' modules');"
+      - name: fetch MMM-pages (third-party, needed by the hidden-page tests)
+        run: |
+          url="$(awk '$1 == "MMM-pages" {print $2}' modules.txt)"
+          ref="$(awk '$1 == "MMM-pages" {print $3}' modules.txt)"
+          git clone --quiet "$url" "$RUNNER_TEMP/MMM-pages"
+          if [ -n "$ref" ]; then git -C "$RUNNER_TEMP/MMM-pages" checkout --quiet "$ref"; fi
+          test -f "$RUNNER_TEMP/MMM-pages/MMM-pages.js"
+      - name: module tests
+        env:
+          MMM_PAGES: ${{ runner.temp }}/MMM-pages/MMM-pages.js
+        run: node --test tests/js/*.test.js

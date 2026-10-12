@@ -1,0 +1,22 @@
+# Pull-based deployment, run by deploy-user.timer. See docs/cicd/README.md
+# and docs/adr/009-pull-based-deployment.md.
+#
+# Install (user units, like magicmirror-user.service):
+#   cp systemd/deploy-user.service ~/.config/systemd/user/deploy.service
+#   cp systemd/deploy-user.timer   ~/.config/systemd/user/deploy.timer
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now deploy.timer
+#
+# Logs:
+#   journalctl --user -u deploy -n 50
+
+[Unit]
+Description=Deploy raspberrypi-magicmirror from GitHub (CI-gated)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/Projects/raspberrypi-magicmirror/scripts/deploy.sh
+SyslogIdentifier=deploy
+# A failed deployment is logged, never retried in a loop: the timer runs
+# again later and deploy.sh skips the commit that failed (state file).

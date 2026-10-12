@@ -1,0 +1,14 @@
+# Every 30 minutes while the mirror is in use. The Witty Pi powers the Pi
+# from 07:30 to 22:15 (ADR-005); deployments stay inside that window and
+# away from the boot itself.
+
+[Unit]
+Description=Check for a new CI-green commit every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* 08..21:00,30
+RandomizedDelaySec=120
+Persistent=false
+
+[Install]
+WantedBy=timers.target
