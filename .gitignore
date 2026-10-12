@@ -16,6 +16,8 @@ modules/MMM-GuestWifi/guest-wifi.png
 * Kopie*
 
 # --- Runtime & logs -------------------------------------------------
+# Sensor recordings (scripts/tof_record.py, gesture.py --capture): large, device-local
+data/
 logs/
 *.log
 
