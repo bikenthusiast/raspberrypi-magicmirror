@@ -1,0 +1,35 @@
+# Gesture control: SEN0628 ToF sensor on UART5 -> swipe -> gesture-action.sh
+#
+# Install:
+#   sudo cp systemd/gesture.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now gesture
+#
+# Watch:
+#   journalctl -u gesture -f
+
+[Unit]
+Description=Gesture control for MagicMirror (SEN0628)
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+User=tobiask
+# /dev/ttyAMA5 belongs to the dialout group
+SupplementaryGroups=dialout
+WorkingDirectory=/home/tobiask/Projects/raspberrypi-magicmirror
+
+ExecStart=/usr/bin/python3 scripts/gesture.py --exec "scripts/gesture-action.sh {gesture}"
+
+Restart=on-failure
+RestartSec=10
+
+# print() lines go to the journal immediately instead of in 4 KB blocks
+Environment=PYTHONUNBUFFERED=1
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
