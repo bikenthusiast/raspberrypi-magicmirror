@@ -9,6 +9,16 @@ fixes behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Health check** `scripts/health-check.sh` with `systemd/health-check-user.timer`: once a minute it
+  checks power (under-voltage flags), temperature, memory, disk, MagicMirror and internet, logs the values
+  to the journal and alerts on change, on the mirror and as an ntfy push to the phone. Restarts
+  MagicMirror when systemd has given up on it ([docs/monitoring.md](docs/monitoring.md),
+  [ADR-010](docs/adr/010-health-check-alerts.md))
+- `config/secrets.example.js`: `healthNtfyTopic`, `healthNtfyServer` (optional; empty = no phone alerts)
+- Hardware watchdog setup in [docs/monitoring.md](docs/monitoring.md#hardware-watchdog)
+
 ## [2.0.0] — YYYY-MM-DD
 
 Camera-free gesture control and an automated path from commit to wall. Major version because

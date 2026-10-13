@@ -164,3 +164,8 @@ and calendar URLs:
 grep -iE "token|secret|api[_-]?key|client[_-]?secret|password|ical|webcal" logs/magicmirror.log | head
 git check-ignore -v logs/ || echo "WARNING: logs/ is not ignored"
 ```
+---
+
+## See also
+
+- [monitoring.md](monitoring.md): the once-a-minute health check (`journalctl -t health`), alerts and the hardware watchdog

@@ -1,0 +1,18 @@
+# Runs health-check.service once a minute. See docs/monitoring.md.
+#
+# The first run waits three minutes after boot, so MagicMirror and Wi-Fi are
+# up before they are judged. Each check also needs several failed runs in a
+# row before it alerts (thresholds at the top of scripts/health-check.sh).
+#
+# Next run:  systemctl --user list-timers health-check.timer
+
+[Unit]
+Description=Run the mirror health check once a minute
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
