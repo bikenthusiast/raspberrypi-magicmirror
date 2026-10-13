@@ -1,0 +1,22 @@
+# Health check: power, temperature, memory, disk, MagicMirror, network.
+# Run once a minute by health-check-user.timer. See docs/monitoring.md.
+#
+# Install (user units, like deploy-user.*):
+#   cp systemd/health-check-user.service ~/.config/systemd/user/health-check.service
+#   cp systemd/health-check-user.timer   ~/.config/systemd/user/health-check.timer
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now health-check.timer
+#
+# Logs:
+#   journalctl -t health -b                 one line per minute
+#   journalctl -t health -p warning -b      alerts and recoveries only
+
+[Unit]
+Description=Mirror health check (power, temperature, memory, MagicMirror, network)
+
+[Service]
+Type=oneshot
+ExecStart=%h/Projects/raspberrypi-magicmirror/scripts/health-check.sh
+SyslogIdentifier=health
+# Never let a hanging curl or ping overlap with the next run.
+TimeoutStartSec=45

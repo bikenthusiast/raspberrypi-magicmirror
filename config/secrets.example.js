@@ -35,6 +35,12 @@ module.exports = {
 	// openweathermap.org -> API keys (One Call 3.0)
 	openWeatherApiKey: "",
 
+	// Phone alerts from scripts/health-check.sh via ntfy (docs/monitoring.md).
+	// Anyone who knows the topic can read and send to it: use a long random
+	// name, e.g. "mirror-" + `openssl rand -hex 12`. Empty = no phone alerts.
+	healthNtfyTopic: "",
+	healthNtfyServer: "https://ntfy.sh",
+
 	// City-level coordinates for weather, rain map and globe.
 	cityLatitude: 0.0,
 	cityLongitude: 0.0,
