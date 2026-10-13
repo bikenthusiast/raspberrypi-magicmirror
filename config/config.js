@@ -89,6 +89,17 @@ let config = {
 			}
 		},
 		{
+  module: "MMM-KitchenTimer",
+  position: "middle_center",
+  config: {
+    timertext: ["1m", "5m", "10m", "25m"],
+    timersecs: [60, 300, 600, 1500],
+    title: "Timer",
+    sound: true,
+    alarmVolume: 0.5,
+  },
+},
+		{
 			module: "MMM-OpenWeatherMapForecast",
 			position: "top_right",
 			header: "Wetter",
@@ -233,11 +244,11 @@ let config = {
 			config: {
 				timings: { default: 0 }, // own rotation off; MMM-SpotifyPages switches
 				modules: [
-					["MMM-MVG", "MMM-MyGCalendar", "MMM-OpenWeatherMapForecast", "MMM-RAIN-MAP", "newsfeed"], // 0 idle
+					["MMM-MVG",  "MMM-MyGCalendar", "MMM-OpenWeatherMapForecast", "MMM-RAIN-MAP", "newsfeed"], // 0 idle
 					["MMM-MVG", "MMM-Globe", "MMM-OpenWeatherMapForecast", "MMM-RAIN-MAP", "newsfeed"], // 1 idle
-					["MMM-MVG", "MMM-LiveLyrics", "MMM-OpenWeatherMapForecast"] // 2 now playing
+					["MMM-MVG","MMM-LiveLyrics", "MMM-OpenWeatherMapForecast"] // 2 now playing
 				],
-				fixed: ["clock", "alert", "updatenotification"],
+				fixed: ["clock", "MMM-KitchenTimer","alert", "updatenotification"],
 				hiddenPages: { gast: ["MMM-GuestWifi"] }
 			}
 		},
