@@ -89,8 +89,10 @@ dtoverlay=w1-gpio,gpiopin=18
 **Witty Pi 4 Mini instead of Witty Pi 4:** The full variant differs by adding
 a DC/DC converter for input voltages up to 30 V and a CR2032 coin cell instead
 of a supercapacitor. Neither is needed with a fixed 5 V supply. The capacitor
-holds the time for about 17 hours without power — and even if it's lost, the
-Pi recovers it via NTP on the next boot. See [ADR-005](adr/005-power-management.md).
+holds the time for about 17 hours without power. If the power is off for longer,
+the RTC keeps a stale time, and the Witty Pi software copies that stale time to the
+system clock at every boot — NTP alone does not fix it. See
+[After a power outage](#after-a-power-outage) and [ADR-005](adr/005-power-management.md).
 
 **HMMD instead of LD2410C:** Sensitivity can be configured independently per
 distance zone. The near zone in front of the mirror can stay sensitive while
@@ -255,6 +257,32 @@ The button on the board remains the fallback: it cleanly shuts the Pi down and
 back up. If a schedule powers it off at the wrong time, this provides access
 again without disassembly — one more argument for the accessible external
 mounting.
+
+### After a power outage
+
+The supercapacitor keeps the Witty Pi's real-time clock (RTC) running for about
+17 hours. After a longer outage the RTC holds a stale time. At every boot the
+Witty Pi software writes the RTC time to the system clock, so the Pi comes up with
+the stale date even though NTP corrects it a moment later, and the next boot
+resets it again. The schedule (on 07:30, off 22:15) runs on the same stale clock.
+
+Seen on 19.10.2026 after the Pi had been unplugged from Friday to Monday: the mirror
+and the calendar showed Friday, `timedatectl` showed the right date after
+`systemctl restart systemd-timesyncd`, and Friday again after a reboot.
+
+Once after every outage longer than about 17 hours:
+
+```bash
+sudo systemctl restart systemd-timesyncd
+timedatectl                     # correct date, "System clock synchronized: yes"
+sudo ~/wittypi/wittyPi.sh       # "Write system time to RTC"; check system and RTC time
+                                # match, and next startup/shutdown are 07:30 / 22:15
+sudo reboot                     # timedatectl must show the right date straight away
+systemctl --user restart magicmirror   # only if the calendar still shows the old day
+```
+
+If the clock is still wrong after this, the Pi has no network: check
+`nmcli device status` and `ping -c3 8.8.8.8` before anything else.
 
 ---
 
