@@ -21,7 +21,7 @@ The decision behind it: [ADR-010](adr/010-health-check-alerts.md).
 | `memory` | MemAvailable < 500 MB | 2 runs | A module leaking memory in Electron |
 | `disk` | Root file system ≥ 90 % | 1 run | Logs, recordings in `data/` |
 | `magicmirror` | `magicmirror.service` not `active` | 3 runs | Crash, failed start, or stopped by hand |
-| `network` | No ping reply from 1.1.1.1 or 9.9.9.9 | 3 runs | Wi-Fi drop, router, under-voltage |
+| `network` | No ping reply from 1.1.1.1 or 9.9.9.9 | 3 runs | See below: the alert says whether the LAN or only the internet is down |
 
 Every value can be changed with an environment variable (`HEALTH_TEMP_MAX_C`, `HEALTH_MEM_MIN_MB`,
 …, see the top of the script), for example in a drop-in for the service:
@@ -35,6 +35,17 @@ systemctl --user edit health-check.service
 An alert fires **once** when a check goes bad and once more when it is OK again; the recovery message
 carries the start time and the duration. A check that stays bad does not repeat every minute. The state
 lives in `~/.local/state/mirror-health/`.
+
+`network` pings the router (the IPv4 default gateway, or `HEALTH_GATEWAY`) when the internet hosts do
+not answer, and the journal line shows the result as `net=ok`, `net=no-internet` or `net=no-lan`:
+
+| `net=` | Meaning | Look at |
+|---|---|---|
+| `no-internet` | The router answers, the internet does not | Router event log (internet / DSL), provider |
+| `no-lan` | The router does not answer, or there is no default route | `journalctl -u NetworkManager -b`, `journalctl -u wpa_supplicant -b` (disconnect `reason=`) |
+
+`no-lan` while Wi-Fi still shows as connected is a link that carries no traffic. The router usually ends
+it after a few minutes with a deauthentication (`reason=2`), and the Pi reconnects.
 
 `power` alerts at most once per boot: bit 16 stays set until the next reboot, and the recovery message
 comes after a reboot without under-voltage.
