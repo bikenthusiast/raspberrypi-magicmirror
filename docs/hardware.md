@@ -284,6 +284,30 @@ systemctl --user restart magicmirror   # only if the calendar still shows the ol
 If the clock is still wrong after this, the Pi has no network: check
 `nmcli device status` and `ping -c3 8.8.8.8` before anything else.
 
+### NTP must stay enabled
+
+The Witty Pi sets the clock once at boot from its RTC. Keeping it accurate
+afterwards, and fixing the RTC after an outage, relies on `systemd-timesyncd`.
+It has to be **enabled**, not only running: `systemctl restart` starts a disabled
+service until the next reboot and leaves it off after that.
+
+```bash
+systemctl is-enabled systemd-timesyncd   # enabled
+timedatectl                              # "System clock synchronized: yes", "NTP service: active"
+sudo systemctl enable --now systemd-timesyncd   # if either is not the case
+```
+
+`RTC time: n/a` in `timedatectl` is normal: the Witty Pi's clock is not a kernel
+RTC device and is only reached through `wittyPi.sh`.
+
+A side effect of a disabled timesyncd: until the Witty Pi software sets the clock,
+early boot uses the modification time of `/var/lib/systemd/timesync/clock`, and
+only timesyncd updates that file. With the service off, every boot begins at the
+same old time in the journal. Seen on 22.10.2026: all boots in
+`journalctl --list-boots` started at 19.10. 09:17, so the start column and the first
+kernel lines of each boot were useless for finding when the Pi was switched on.
+The time from the Witty Pi itself was correct throughout.
+
 ---
 
 ## HDMI wiring and CEC
