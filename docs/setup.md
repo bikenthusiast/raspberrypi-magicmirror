@@ -968,4 +968,4 @@ troubleshooting: [`logging.md`](logging.md).
 **Improvements:**
 
 - [ ] Commit pins in `modules.txt` — without them a rebuild in six months
-      gets different code
+      gets different code --done
