@@ -30,6 +30,9 @@ TEMP_MAX_C="${HEALTH_TEMP_MAX_C:-75}"            # the Pi 4 throttles at 80 °C
 MEM_MIN_MB="${HEALTH_MEM_MIN_MB:-500}"           # MemAvailable
 DISK_MAX_PCT="${HEALTH_DISK_MAX_PCT:-90}"        # root file system
 PING_HOSTS="${HEALTH_PING_HOSTS:-1.1.1.1 9.9.9.9}"
+# Router to ping when the internet hosts do not answer. Empty = the IPv4 default
+# gateway at the time of the run. Tells a Wi-Fi drop from a provider outage.
+GATEWAY="${HEALTH_GATEWAY:-}"
 MM_URL="${HEALTH_MM_URL:-http://localhost:8080}"
 # Consecutive failed runs (= minutes) before a check raises an alert. Short
 # outages -- a deployment restarting MagicMirror, a router reconnect -- stay quiet.
@@ -141,10 +144,17 @@ mem_mb="$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)"
 disk_pct="$(df --output=pcent / | tail -1 | tr -dc '0-9')"
 mm_state="$(systemctl --user is-active magicmirror 2>/dev/null || true)"
 
-net="down"
+# net: ok | no-internet (router answers, internet does not) | no-lan (router
+# unreachable or no default route: Wi-Fi drop or link without traffic).
+# The router is only pinged when the internet hosts fail.
+net="no-internet"
 for h in $PING_HOSTS; do
 	if ping -c 1 -W 3 "$h" >/dev/null 2>&1; then net="ok"; break; fi
 done
+gw="${GATEWAY:-$(ip -4 route show default 2>/dev/null | awk '{print $3; exit}' || true)}"
+if [[ "$net" != "ok" ]]; then
+	if [[ -z "$gw" ]] || ! ping -c 1 -W 2 "$gw" >/dev/null 2>&1; then net="no-lan"; fi
+fi
 
 info "health: throttled=$throttled temp=${temp_c}C mem_avail=${mem_mb}MB disk=${disk_pct}% mm=${mm_state:-unknown} net=$net"
 
@@ -253,8 +263,17 @@ fi
 
 # Phone alerts for this one cannot leave while the network is down. The
 # "OK again" message afterwards carries the start time and the duration.
-if [[ "$net" == "ok" ]]; then
-	check network yes "" "$FAILS_NET"
-else
-	check network no "No internet: no reply from $PING_HOSTS." "$FAILS_NET"
-fi
+# The message names the side that failed as of the alerting run; the journal
+# line of every run (net=...) shows if that changed during the outage.
+case "$net" in
+	ok)
+		check network yes "" "$FAILS_NET" ;;
+	no-internet)
+		check network no "No internet, LAN ok: router ${gw} answers, no reply from $PING_HOSTS. Router or provider." "$FAILS_NET" ;;
+	*)
+		if [[ -z "$gw" ]]; then
+			check network no "No LAN: no default route (Wi-Fi not connected). Logs: journalctl -u NetworkManager -b" "$FAILS_NET"
+		else
+			check network no "No LAN: router ${gw} does not answer. Wi-Fi link down or stuck. Logs: journalctl -u NetworkManager -b" "$FAILS_NET"
+		fi ;;
+esac

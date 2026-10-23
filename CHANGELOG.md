@@ -12,7 +12,8 @@ fixes behaviour.
 ### Added
 
 - **Health check** `scripts/health-check.sh` with `systemd/health-check-user.timer`: once a minute it
-  checks power (under-voltage flags), temperature, memory, disk, MagicMirror and internet, logs the values
+  checks power (under-voltage flags), temperature, memory, disk, MagicMirror and internet (pinging the
+  router as well, so an alert tells a Wi-Fi drop from a provider outage), logs the values
   to the journal and alerts on change, on the mirror and as an ntfy push to the phone. Restarts
   MagicMirror when systemd has given up on it ([docs/monitoring.md](docs/monitoring.md),
   [ADR-010](docs/adr/010-health-check-alerts.md))
