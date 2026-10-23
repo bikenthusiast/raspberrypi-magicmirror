@@ -36,7 +36,8 @@ let config = {
 		},
 		{
 			module: "updatenotification",
-			position: "top_bar"
+			position: "top_bar",
+			hide:true
 		},
 		{
 			module: "clock",
@@ -90,7 +91,7 @@ let config = {
 		},
 		{
   module: "MMM-KitchenTimer",
-  position: "middle_center",
+  position: "top_left",
   config: {
     timertext: ["1m", "5m", "10m", "25m"],
     timersecs: [60, 300, 600, 1500],
@@ -184,13 +185,28 @@ let config = {
 						color: "#f4db1e92"
 					}
 				],
-				locale: "de-DE",
-				showTodayPanel: true,
-				todayPanelWidth: "300px",
+								locale: "de-DE",
+				// Mirror layout (fork 1.4.0): light on black, today stacked on top
+				// with relative times, 3 weeks of colour bars from this week.
+				layout: "mirror",
+				showHeader: false, // the clock above already shows the date
+				weeks: 3,
+				pastWeekOpacity: 0.55, // 5.7:1 on black
 				todayPanelTitle: "Heute",
 				todayPanelEmptyText: "Keine Termine heute",
+				todayDoneText: "Keine weiteren Termine heute",
 				allDayText: "Ganztägig",
+				nowText: "Jetzt",
+				endsInText: "noch {time}",
+				moreText: "+{n} weitere",
+				staleText: "Stand {time}",
+				privateTitle: "Termin",
+				loadingText: "Kalender wird geladen …",
 				weekStartsOnMonday: true,
+				// Card layout only; ignored by the mirror layout. Keep them until
+				// modules.txt points at the fork's 1.4.0 commit.
+				showTodayPanel: true,
+				todayPanelWidth: "300px",
 				backgroundColor: "#616161",
 				// Keyword (regex) → Google Calendar colour
 				colorRules: [

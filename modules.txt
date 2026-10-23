@@ -18,12 +18,14 @@
 # MMM-SpotifyPages and MMM-GuestWifi are not listed -- they live in
 # this repo and are symlinked into place instead.
 
-MMM-MVG                     https://github.com/KoblerS/MMM-MVG
-MMM-RAIN-MAP                https://github.com/jalibu/MMM-RAIN-MAP
-MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control
-MMM-pages                   https://github.com/edward-shen/MMM-pages
-MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe
-MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast
-MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar d7db1d1
-MMM-OnSpotify               https://github.com/Fabrizz/MMM-OnSpotify
-MMM-LiveLyrics              https://github.com/Fabrizz/MMM-LiveLyrics
+MMM-MVG                     https://github.com/KoblerS/MMM-MVG                     ec7beac
+MMM-RAIN-MAP                https://github.com/jalibu/MMM-RAIN-MAP                 8a2ad88
+MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control           d3041ff
+MMM-pages                   https://github.com/edward-shen/MMM-pages               34a7ccc
+MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe           d15f63e
+MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast f222358
+MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar       4435ff1
+MMM-OnSpotify               https://github.com/Fabrizz/MMM-OnSpotify               1d15588
+MMM-LiveLyrics              https://github.com/Fabrizz/MMM-LiveLyrics              9acf344
+MMM-page-indicator          https://github.com/edward-shen/MMM-page-indicator      c431bb9
+MMM-KitchenTimer            https://github.com/bwente/MMM-KitchenTimer             2a70109

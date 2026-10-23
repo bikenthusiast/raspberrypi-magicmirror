@@ -28,7 +28,7 @@ import time
 
 from sen0628 import SEN0628
 
-LABELS = ("swipe_left", "swipe_right", "swipe_up", "swipe_down", "push", "none")
+LABELS = ("swipe_left", "swipe_right", "swipe_up", "swipe_down", "push", "pull", "none")
 INVALID = 4000
 
 
