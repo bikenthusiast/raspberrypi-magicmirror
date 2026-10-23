@@ -37,7 +37,8 @@ INVALID = 4000
 class SwipeDetector:
     def __init__(self, near=1000, delta=60, min_zones=3, travel=0.35, window=1.8,
                  lockout=1.5, alpha=0.05, absorb=3.0, axis="col", invert=False, size=4,
-                 band=None):
+                 band=None, pushpull=True, push_delta=250, push_window=1.0, push_max_zones=6,
+                 push_max_lat=0.20):
         self.near, self.delta, self.min_zones = near, delta, min_zones
         self.travel, self.window, self.lockout = travel, window, lockout
         self.alpha, self.absorb = alpha, absorb
@@ -45,9 +46,18 @@ class SwipeDetector:
         # band: only the zones within `band` mm of the nearest foreground zone count as hand
         # (separates the hand from a closer-than-background arm or body). None = off.
         self.band = band
+        # push/pull: a compact hand (<= push_max_zones, i.e. not a body/arm) whose
+        # nearest distance changes by >= push_delta mm within push_window s, with
+        # little lateral travel. The baseline reseeds every time the hand (re)appears,
+        # so the onset of a hand is never itself a push, and a slow body approach
+        # (many zones from the start) never seeds.
+        self.pushpull = pushpull
+        self.push_delta, self.push_window, self.push_max_zones = push_delta, push_window, push_max_zones
+        self.push_max_lat = push_max_lat
         self.bg = None
         self.hand_since = [None] * size * size
         self.hist = collections.deque()
+        self.dmin_hist = collections.deque()
         self.locked_until = 0.0
 
     def _pos(self, i):
@@ -80,12 +90,14 @@ class SwipeDetector:
             if is_hand:
                 hand.append(i)
 
+        hand_dmin = min((mm[i] for i in hand), default=None)
         if self.band is not None and hand:
-            dmin = min(mm[i] for i in hand)
-            hand = [i for i in hand if mm[i] <= dmin + self.band]
-        info = {"zones": len(hand), "pos": None}
+            hand = [i for i in hand if mm[i] <= hand_dmin + self.band]
+        info = {"zones": len(hand), "pos": None, "dmin": hand_dmin}
         if t < self.locked_until:
             return None, info
+
+        # --- lateral swipe (unchanged) ---
         if len(hand) >= self.min_zones:
             pos = sum(self._pos(i) for i in hand) / len(hand)
             info["pos"] = pos
@@ -99,15 +111,62 @@ class SwipeDetector:
                 if abs(move) >= self.travel:
                     left = (move > 0) != self.invert
                     self.hist.clear()
+                    self.dmin_hist.clear()
                     self.locked_until = t + self.lockout
                     return ("SWIPE_LEFT" if left else "SWIPE_RIGHT"), info
+
+        # --- push / pull (distance change of a hand) ---
+        # Seed the baseline only on a compact (hand-like, not body) frame; once
+        # seeded, keep tracking even as the hand comes close and fills more zones
+        # (a flat hand at 1-2 cm covers every zone). A body approach starts with
+        # many zones, so it never seeds.
+        if (self.pushpull and hand_dmin is not None and len(hand) >= 1
+                and (self.dmin_hist or len(hand) <= self.push_max_zones)):
+            pos_all = sum(self._pos(i) for i in hand) / len(hand)
+            self.dmin_hist.append((t, hand_dmin, pos_all))
+            while self.dmin_hist and t - self.dmin_hist[0][0] > self.push_window:
+                self.dmin_hist.popleft()
+            # Decide only once the window is essentially full, so a swipe (which
+            # moves laterally within this time) is recognised first and the lateral
+            # guard can see its movement. The candidate drop/lat are exposed in
+            # `info` for live tuning (shown by -v as pd=/pl=).
+            if len(self.dmin_hist) >= 2:
+                span = t - self.dmin_hist[0][0]
+                d_old = self.dmin_hist[0][1]
+                # Net lateral displacement (not peak-to-peak): the mean centroid of
+                # the newest vs. the oldest frames. A centred push/pull nets ~0 even
+                # though the coarse 1-3 zone centroid jitters frame to frame; a swipe
+                # nets a large value. Robust where peak-to-peak was not.
+                poss = [p for _, _, p in self.dmin_hist]
+                k = max(1, len(poss) // 4)
+                lat = abs(sum(poss[-k:]) / k - sum(poss[:k]) / k)
+                drop = d_old - hand_dmin  # +ve: moved closer (push), -ve: moved away (pull)
+                # Suppress while a lateral swipe is building: the swipe history uses
+                # the steadier >=min_zones centroid, so this kills swipe-onset false
+                # pushes without touching a real (few-zone, centred) push.
+                swipe_lat = 0.0
+                if len(self.hist) >= 2:
+                    ps = [p for _, p in self.hist]
+                    swipe_lat = max(ps) - min(ps)
+                info["pd"], info["pl"] = int(drop), round(lat, 2)
+                if (span >= self.push_window * 0.8 and lat <= self.push_max_lat
+                        and swipe_lat <= self.push_max_lat and abs(drop) >= self.push_delta):
+                    self.dmin_hist.clear()
+                    self.hist.clear()
+                    self.locked_until = t + self.lockout
+                    return ("PUSH" if drop > 0 else "PULL"), info
+        else:
+            self.dmin_hist.clear()
         return None, info
 
 
 def make_detector(a):
     return SwipeDetector(near=a.near, delta=a.delta, min_zones=a.min_zones, travel=a.travel,
                          window=a.window, lockout=a.lockout, alpha=a.alpha, absorb=a.absorb,
-                         axis=a.axis, invert=a.invert, band=a.band)
+                         axis=a.axis, invert=a.invert, band=a.band,
+                         pushpull=not a.no_pushpull, push_delta=a.push_delta,
+                         push_window=a.push_window, push_max_zones=a.push_max_zones,
+                         push_max_lat=a.push_max_lat)
 
 
 def replay(a):
@@ -275,7 +334,9 @@ def live(a):
                 cap.detected(t, ev)
             if a.verbose:
                 pos = f"{info['pos']:.2f}" if info["pos"] else "  - "
-                print(f"zones={info['zones']:2d} pos={pos}  " +
+                dmin = f"{info['dmin']:4d}" if info.get("dmin") is not None else "   -"
+                push = f" pd={info['pd']:+5d} pl={info['pl']:.2f}" if "pd" in info else ""
+                print(f"zones={info['zones']:2d} pos={pos} dmin={dmin}{push}  " +
                       " ".join("  .." if v >= INVALID else f"{v // 10:4d}" for v in mm))
             if ev:
                 print(f"{time.strftime('%H:%M:%S')}  {ev}", flush=True)
@@ -296,7 +357,7 @@ def main():
     p.add_argument("--port", default="/dev/ttyAMA5")
     p.add_argument("--size", type=int, choices=(4, 8), default=4, help="zones per side (4)")
     p.add_argument("--replay", nargs="+", metavar="JSONL", help="run on recorded takes instead of the sensor")
-    p.add_argument("--exec", help="command per swipe, {gesture} is replaced, e.g. 'echo {gesture}'")
+    p.add_argument("--exec", help="command per gesture, {gesture} is replaced, e.g. 'echo {gesture}'")
     p.add_argument("--capture", metavar="DIR", help="save takes: Enter = missed, f = false detection")
     p.add_argument("--capture-seconds", type=float, default=4.0, help="seconds kept per capture (4)")
     p.add_argument("-v", "--verbose", action="store_true")
@@ -311,6 +372,14 @@ def main():
     p.add_argument("--lockout", type=float, default=1.5, help="pause after a swipe in s (1.5)")
     p.add_argument("--alpha", type=float, default=0.05, help="background adaptation per frame (0.05)")
     p.add_argument("--absorb", type=float, default=3.0, help="s until a static object becomes background (3)")
+    p.add_argument("--no-pushpull", action="store_true", help="disable PUSH/PULL detection")
+    p.add_argument("--push-delta", type=int, default=250,
+                   help="min mm the hand must move toward/away within the window (250)")
+    p.add_argument("--push-window", type=float, default=1.0, help="push/pull measurement window in s (1.0)")
+    p.add_argument("--push-max-zones", type=int, default=6,
+                   help="max hand zones for push/pull (above this = body/arm, ignored) (6)")
+    p.add_argument("--push-max-lat", type=float, default=0.20,
+                   help="max net lateral displacement (0..1) allowed during a push/pull (0.20)")
     a = p.parse_args()
     replay(a) if a.replay else live(a)
 
