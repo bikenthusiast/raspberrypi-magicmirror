@@ -71,13 +71,15 @@ window, ADR-005; a run missed while the Pi was off happens right after the next 
    | `scripts/presence.py` | `sudo systemctl restart presence` |
    | `scripts/edge_bridge.py` | `sudo systemctl restart edge-bridge` |
    | `systemd/**` | reported: install the unit by hand |
-   | `modules.txt`, `scripts/bootstrap.sh` | reported: run `scripts/bootstrap.sh` |
+   | `modules.txt`, `scripts/bootstrap.sh` | run `scripts/bootstrap.sh`, then `systemctl --user restart magicmirror` ([updates.md](../updates.md)) |
+   | `config/os/**`, `scripts/setup-os-updates.sh` | reported: run `sudo scripts/setup-os-updates.sh` |
    | `config/*.example*` | reported: compare with the local copy |
    | anything else (docs, tests, `guest-page.sh`, …) | nothing — read fresh on every call |
 
 5. **Smoke test:** MagicMirror answers on `http://localhost:8080` within 120 s, and every restarted unit is
    `active`.
-6. **On failure:** `git reset --hard` to the previous commit, restart the same services, and write the failed
+6. **On failure** (smoke test, or `bootstrap.sh` exiting non-zero): `git reset --hard` to the previous commit,
+   run `bootstrap.sh` again if it ran (old pins back), restart the same services, and write the failed
    commit to `~/.local/state/mirror-deploy/failed-commit`. That commit is skipped from then on; the next
    commit on `main` is tried normally.
 
@@ -151,9 +153,10 @@ commit on `main` (the cleaner way).
 ### Limits
 
 - The smoke test checks that services are up, not that the mirror looks right.
-- Changes to systemd units, the module manifest and templates need a manual step. The log line starts with
+- Changes to systemd units, the OS update config and templates need a manual step. The log line starts with
   `MANUAL STEP`.
-- Third-party modules are not updated by this pipeline; `modules.txt` and `scripts/bootstrap.sh` handle
-  them.
+- Third-party modules move only when `modules.txt` changes on `main` — by hand or through the weekly
+  module-update PR ([updates.md](../updates.md)). A deploy that runs `bootstrap.sh` needs the network and
+  takes minutes.
 - Secrets never pass through it: `config/secrets.js`, `/etc/magicmirror/*.env` and `guest-wifi.png` are
   git-ignored or outside the repo, and `git reset --hard` does not touch ignored files.

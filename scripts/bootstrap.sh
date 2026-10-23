@@ -6,6 +6,11 @@
 #
 # Usage:  ./scripts/bootstrap.sh [/path/to/MagicMirror]
 #
+# Exits non-zero when a clone, checkout or npm install fails, or when a
+# patched file does not parse. Moving a module to a new pin discards local
+# changes to its tracked files (package-lock.json rewritten by npm, the
+# node-fetch patch, which is applied again). deploy.sh runs it after modules.txt changes.
+#
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,22 +38,48 @@ mkdir -p "$MODULES_DIR"
 mkdir -p "$MM_ROOT/logs"
 
 # --- 1. Clone or update the third-party modules ----------------------
+#
+# Columns: name, url, optional pin, optional policy (follow|hold, read by
+# module-updates.sh, not here), optional "# comment".
+#
+# A module is only fetched when its pin is not already there, and npm runs
+# only when the checked-out commit changed or node_modules is missing. That
+# keeps a re-run cheap enough for deploy.sh, which runs this script whenever
+# modules.txt changes, and again on a rollback.
 
-while read -r name url pin; do
+while read -r name url pin _rest; do
 	[[ -z "${name:-}" || "$name" == \#* ]] && continue
+	[[ "${pin:-}" == \#* ]] && pin=""
 
 	target="$MODULES_DIR/$name"
+	before=""
 
 	if [[ -d "$target/.git" ]]; then
-		echo "==> $name: updating"
-		git -C "$target" fetch --quiet origin
+		before="$(git -C "$target" rev-parse HEAD)"
+		if [[ -n "${pin:-}" ]] && git -C "$target" cat-file -e "$pin^{commit}" 2>/dev/null; then
+			echo "==> $name"
+		else
+			echo "==> $name: fetching"
+			git -C "$target" fetch --quiet origin
+		fi
 	else
 		echo "==> $name: cloning"
 		git clone --quiet "$url" "$target"
 	fi
 
 	if [[ -n "${pin:-}" ]]; then
-		git -C "$target" checkout --quiet "$pin"
+		# Moving to another commit discards local changes to tracked files:
+		# npm install rewrites package-lock.json in some modules, and the
+		# node-fetch patch below is re-applied anyway. Without --force such a
+		# change blocks the checkout ("would be overwritten").
+		want="$(git -C "$target" rev-parse --verify --quiet "$pin^{commit}")" \
+			|| { echo "    ${RED}ERROR${NC} $name: commit $pin not found upstream" >&2; exit 1; }
+		if [[ "$(git -C "$target" rev-parse HEAD)" != "$want" ]]; then
+			if [[ -n "$(git -C "$target" status --porcelain --untracked-files=no)" ]]; then
+				echo "    discarding local changes: $(git -C "$target" status --porcelain --untracked-files=no | awk '{print $2}' | paste -sd ' ')"
+			fi
+			git -C "$target" checkout --quiet --force "$want"
+		fi
 		echo "    pinned to $pin"
 	else
 		branch="$(git -C "$target" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|origin/||' || echo master)"
@@ -57,10 +88,12 @@ while read -r name url pin; do
 		echo "    ${YELLOW}no pin${NC}, tracking $branch"
 	fi
 
-	# npm install only where dependencies are declared
+	# npm install only where dependencies are declared, and only when needed
 	if [[ -f "$target/package.json" ]] && grep -q '"dependencies"' "$target/package.json"; then
-		echo "    npm install"
-		(cd "$target" && npm install --omit=dev --silent)
+		if [[ "$(git -C "$target" rev-parse HEAD)" != "$before" || ! -d "$target/node_modules" ]]; then
+			echo "    npm install"
+			(cd "$target" && npm install --omit=dev --silent)
+		fi
 	fi
 done < "$MANIFEST"
 
@@ -111,6 +144,7 @@ patch_fetch "$MODULES_DIR/MMM-LiveLyrics/utils/LyricsFetcher.js" "MMM-LiveLyrics
 # MagicMirror log -- naming neither file nor line.
 echo
 echo "==> verifying patched files"
+errors=0
 for f in \
 	"$MODULES_DIR/MMM-OnSpotify/utils/SpotifyFetcher.js" \
 	"$MODULES_DIR/MMM-LiveLyrics/utils/LyricsFetcher.js"
@@ -121,6 +155,7 @@ do
 	else
 		echo "    ${RED}SYNTAX ERROR${NC} $f"
 		node --check "$f" 2>&1 | head -3 | sed 's/^/      /'
+		errors=1
 	fi
 done
 
@@ -142,6 +177,12 @@ for own in MMM-SpotifyPages MMM-GuestWifi; do
 done
 
 # --- 4. Summary ------------------------------------------------------
+
+# A non-zero exit lets deploy.sh roll back instead of starting a broken module.
+(( errors == 0 )) || { echo "${RED}FAILED${NC}: a patched file does not parse" >&2; exit 1; }
+
+# deploy.sh sets this: the first-install hints below are noise in its log.
+[[ "${BOOTSTRAP_NO_HINTS:-0}" == "1" ]] && { echo "${GREEN}Done.${NC}"; exit 0; }
 
 echo
 echo "${GREEN}Done.${NC} Next:"

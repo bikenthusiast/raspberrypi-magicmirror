@@ -1,0 +1,25 @@
+// Unattended upgrades for the mirror -- docs/updates.md, ADR-011.
+// Installed by scripts/setup-os-updates.sh to /etc/apt/apt.conf.d/.
+//
+// Only Debian security updates are installed automatically. Point releases,
+// the Raspberry Pi archive (kernel, firmware, labwc, Chromium) and everything
+// else wait for the monthly `sudo apt full-upgrade`, which the health check
+// reminds of after 35 days.
+
+// Enable the daily run (what 20auto-upgrades would set; this file sorts later).
+APT::Periodic::Enable "1";
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+
+// Replace, not extend, the distribution's list of allowed origins.
+#clear Unattended-Upgrade::Origins-Pattern;
+Unattended-Upgrade::Origins-Pattern {
+        "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+};
+
+// Never reboot on its own: the Witty Pi powers the Pi off every night, so a
+// new library or kernel is in use by the next morning anyway.
+Unattended-Upgrade::Automatic-Reboot "false";
+
+// Results in the journal: journalctl -t unattended-upgrade
+Unattended-Upgrade::SyslogEnable "true";

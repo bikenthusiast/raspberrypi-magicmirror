@@ -7,6 +7,7 @@
 #
 #   - on the mirror, through MMM-Remote-Control and the default alert module
 #   - on the phone, as an ntfy push, if healthNtfyTopic is set in secrets.js
+#     (priority "low" checks -- the monthly OS update reminder -- phone only)
 #
 # Alerts fire on state changes only: once when a check fails, once when it
 # recovers. A check that stays bad does not repeat every minute.
@@ -42,6 +43,13 @@ FAILS_NET="${HEALTH_FAILS_NET:-3}"
 # started again, at most once per this many minutes. 0 disables it.
 MM_RESTART_EVERY_MIN="${HEALTH_MM_RESTART_EVERY_MIN:-30}"
 MIRROR_ALERT_MS="${HEALTH_MIRROR_ALERT_MS:-60000}"
+# OS updates (docs/updates.md). Security updates are installed daily by
+# unattended-upgrades; still pending after this many days means it is not
+# working. Everything else waits for a manual full-upgrade, reminded after
+# OS_UPDATES_DAYS. The apt simulation behind both is cached for an hour.
+SEC_UPDATES_DAYS="${HEALTH_SEC_UPDATES_DAYS:-2}"
+OS_UPDATES_DAYS="${HEALTH_OS_UPDATES_DAYS:-35}"
+APT_CACHE_MIN="${HEALTH_APT_CACHE_MIN:-60}"
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mirror-health"
 HOST="$(hostname)"
@@ -156,7 +164,38 @@ if [[ "$net" != "ok" ]]; then
 	if [[ -z "$gw" ]] || ! ping -c 1 -W 2 "$gw" >/dev/null 2>&1; then net="no-lan"; fi
 fi
 
-info "health: throttled=$throttled temp=${temp_c}C mem_avail=${mem_mb}MB disk=${disk_pct}% mm=${mm_state:-unknown} net=$net"
+# Pending OS updates: "<all> <security>" from an apt simulation (no root, no
+# network: it reads the package lists apt-daily.timer refreshed). Takes a few
+# seconds on the Pi, hence the cache. --dry-run computes fresh, keeps nothing.
+os_updates="unknown"
+sec_updates="unknown"
+if command -v apt-get >/dev/null 2>&1; then
+	apt_count () {
+		apt-get -s -o Debug::NoLocking=1 dist-upgrade 2>/dev/null \
+			| awk '/^Inst / {t++; if (tolower($0) ~ /security/) s++} END {print t + 0, s + 0}'
+	}
+	if [[ "$MODE" == "run" ]]; then
+		mkdir -p "$STATE_DIR"
+		cache="$STATE_DIR/apt-pending"
+		if [[ ! -f "$cache" ]] || [[ -n "$(find "$cache" -mmin +"$APT_CACHE_MIN" 2>/dev/null)" ]]; then
+			apt_count >"$cache.tmp" && mv "$cache.tmp" "$cache"
+		fi
+		read -r os_updates sec_updates <"$cache" || true
+	else
+		read -r os_updates sec_updates < <(apt_count) || true
+	fi
+fi
+
+# A newer kernel of the running flavour installed = reboot pending. Informational
+# only: the Witty Pi power-cycles the Pi every night, which applies it.
+reboot="no"
+running="$(uname -r)"
+newest="$(find /lib/modules -mindepth 1 -maxdepth 1 -name "*+${running#*+}" -printf '%f\n' 2>/dev/null | sort -V | tail -1 || true)"
+if [[ -e /run/reboot-required || ( -n "$newest" && "$newest" != "$running" ) ]]; then
+	reboot="pending"
+fi
+
+info "health: throttled=$throttled temp=${temp_c}C mem_avail=${mem_mb}MB disk=${disk_pct}% mm=${mm_state:-unknown} net=$net os_updates=$os_updates sec=$sec_updates reboot=$reboot"
 
 # --- self-healing: MagicMirror ------------------------------------------------
 #
@@ -184,8 +223,11 @@ fi
 #
 # State per check: "<consecutive fails> <first failure epoch> <alerted 0|1>".
 
+# check NAME yes|no PROBLEM MIN_FAILS [PRIORITY] [MIN_AGE_S]
+# Alerts after MIN_FAILS bad runs in a row and, if given, once the problem is
+# at least MIN_AGE_S seconds old. PRIORITY "low" goes to the phone only.
 check () {
-	local name="$1" ok="$2" problem="$3" min_fails="$4" priority="${5:-high}"
+	local name="$1" ok="$2" problem="$3" min_fails="$4" priority="${5:-high}" min_age="${6:-0}"
 	local fails=0 since=0 alerted=0 now
 	now="$(date +%s)"
 
@@ -199,8 +241,12 @@ check () {
 
 	if [[ "$ok" == "yes" ]]; then
 		if [[ "$alerted" == "1" ]]; then
-			local msg
-			msg="$name OK again (problem since $(date -d "@$since" +%H:%M), $(( (now - since) / 60 )) min)"
+			local msg mins=$(( (now - since) / 60 ))
+			if (( mins < 1440 )); then
+				msg="$name OK again (problem since $(date -d "@$since" +%H:%M), $mins min)"
+			else
+				msg="$name OK again (problem since $(date -d "@$since" '+%d.%m. %H:%M'), $(( mins / 1440 )) days)"
+			fi
 			warn "health: RESOLVED $msg"
 			alert_phone "$HOST: $name OK" "$msg" default "white_check_mark"
 		fi
@@ -210,9 +256,9 @@ check () {
 
 	fails=$(( fails + 1 ))
 	(( since > 0 )) || since="$now"
-	if (( fails >= min_fails )) && [[ "$alerted" == "0" ]]; then
+	if (( fails >= min_fails && now - since >= min_age )) && [[ "$alerted" == "0" ]]; then
 		warn "health: ALERT $name: $problem"
-		alert_mirror "Mirror: $name" "$problem"
+		[[ "$priority" == "low" ]] || alert_mirror "Mirror: $name" "$problem"
 		alert_phone "$HOST: $name" "$problem" "$priority" "warning"
 		alerted=1
 	fi
@@ -277,3 +323,19 @@ case "$net" in
 			check network no "No LAN: router ${gw} does not answer. Wi-Fi link down or stuck. Logs: journalctl -u NetworkManager -b" "$FAILS_NET"
 		fi ;;
 esac
+
+# OS updates. Both checks count in days, not runs: the Pi is off at night.
+if [[ "$sec_updates" =~ ^[0-9]+$ ]]; then
+	if (( sec_updates > 0 )); then
+		check security-updates no "$sec_updates security update(s) pending for ${SEC_UPDATES_DAYS}+ days: unattended-upgrades is not installing them. Check: scripts/setup-os-updates.sh --check" 1 high $(( SEC_UPDATES_DAYS * 86400 ))
+	else
+		check security-updates yes "" 1
+	fi
+fi
+if [[ "$os_updates" =~ ^[0-9]+$ ]]; then
+	if (( os_updates > 0 )); then
+		check os-updates no "$os_updates OS update(s) waiting for ${OS_UPDATES_DAYS}+ days. Time for: sudo apt update && sudo apt full-upgrade (docs/updates.md)" 1 low $(( OS_UPDATES_DAYS * 86400 ))
+	else
+		check os-updates yes "" 1
+	fi
+fi

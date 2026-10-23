@@ -19,6 +19,22 @@ fixes behaviour.
   [ADR-010](docs/adr/010-health-check-alerts.md))
 - `config/secrets.example.js`: `healthNtfyTopic`, `healthNtfyServer` (optional; empty = no phone alerts)
 - Hardware watchdog setup in [docs/monitoring.md](docs/monitoring.md#hardware-watchdog)
+- **Reviewable updates** ([docs/updates.md](docs/updates.md), [ADR-011](docs/adr/011-reviewable-updates.md)):
+  - `modules.txt` has a policy per module, `follow` or `hold`
+  - `scripts/module-updates.sh` and the weekly workflow `module-updates.yml` move the `follow` pins and
+    open a pull request listing the new commits and dependency changes
+  - `scripts/setup-os-updates.sh` with `config/os/`: `unattended-upgrades` for Debian security updates
+    only, apt timers inside the Witty Pi window
+  - Health check: `os_updates=`, `sec=`, `reboot=` in every line; alerts when security updates stall for
+    2 days and, phone only, when the manual OS update is 35 days overdue
+
+### Changed
+
+- `deploy.sh` runs `bootstrap.sh` when `modules.txt` or `bootstrap.sh` changes (was a manual step) and
+  restores the old pins on rollback
+- `bootstrap.sh` fetches only modules whose pin is missing, runs `npm install` only where the commit
+  changed, and exits non-zero when a patched file does not parse
+- `updatenotification` disabled; removed from the `fixed` modules of MMM-pages
 
 ## [2.0.0] — YYYY-MM-DD
 
