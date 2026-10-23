@@ -132,6 +132,26 @@ and the alert says so ([monitoring.md](monitoring.md)).
 
 ### The update popup at boot
 
-The "updates available" notice on the desktop comes from the **Updater** plugin of the taskbar. On the
-mirror it only flashes up before MagicMirror covers the screen, and the health check reports the same
-information. Remove it: right-click the taskbar → *Add / Remove Plugins…* → remove *Updater*.
+The "updates available" notice on the desktop comes from the `updater` widget of the taskbar
+(`wf-panel-pi`). On the mirror it only flashes up before MagicMirror covers the screen, and the health
+check reports the same information. The widget list lives in `/etc/xdg/wf-panel-pi/wf-panel-pi.ini`,
+which package updates overwrite; a copy of the line without `updater` in the user file takes precedence:
+
+```bash
+sys=/etc/xdg/wf-panel-pi/wf-panel-pi.ini
+usr=~/.config/wf-panel-pi/wf-panel-pi.ini
+sect="$(awk '/^\[/{s=$0} /^widgets_right=/{print s; exit}' "$sys")"
+line="$(grep -m1 '^widgets_right=' "$sys" | sed 's/ updater//')"
+touch "$usr"; cp "$usr" "$usr.bak"
+if grep -q '^widgets_right=' "$usr"; then
+  sed -i "s|^widgets_right=.*|$line|" "$usr"
+elif [ -n "$sect" ] && grep -qxF "$sect" "$usr"; then
+  sed -i "/^$(printf '%s' "$sect" | sed 's/[][]/\\&/g')\$/a $line" "$usr"
+else
+  printf '%s\n%s\n' "$sect" "$line" >> "$usr"
+fi
+cat "$usr"        # [panel] / widgets_right=... without updater; takes effect after a reboot
+```
+
+Done on the mirror on 23.10.2026 (Trixie). Side effect: the user file now fixes the right-hand widget
+list, so widgets added by later panel versions do not appear there.
