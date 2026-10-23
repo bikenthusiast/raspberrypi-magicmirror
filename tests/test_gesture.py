@@ -99,3 +99,20 @@ def test_static_object_is_absorbed_into_the_background():
         zones.append(info["zones"])
         t += 0.06
     assert zones[0] > 0 and zones[-1] == 0
+
+
+def test_pushpull_is_off_by_default():
+    """PUSH/PULL is experimental and opt-in (--pushpull) until it has been tuned
+    on push/pull recordings; the default detector must stay swipe-only."""
+    assert SwipeDetector().pushpull is False
+
+
+def test_pushpull_neither_fires_on_nor_steals_recorded_takes():
+    """With PUSH/PULL on, none of the recorded swipe or "none" takes may produce
+    a PUSH or PULL, and every swipe result must be the same as with it off. A hand
+    entering from far away on its way into a swipe once read as a push here."""
+    for p in takes("swipe_left") + takes("swipe_right") + takes("none"):
+        frames = load(p)[1]
+        on = events(frames, pushpull=True)
+        assert not {"PUSH", "PULL"} & set(on), f"{p.parent.name}/{p.name}: {on}"
+        assert on == events(frames), p.name
