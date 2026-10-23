@@ -35,9 +35,11 @@ let config = {
 			module: "alert"
 		},
 		{
+			// Off: module updates arrive as a weekly pull request instead
+			// (scripts/module-updates.sh, docs/updates.md).
 			module: "updatenotification",
 			position: "top_bar",
-			hide:true
+			disabled: true
 		},
 		{
 			module: "clock",
@@ -264,7 +266,7 @@ let config = {
 					["MMM-MVG", "MMM-Globe", "MMM-OpenWeatherMapForecast", "MMM-RAIN-MAP", "newsfeed"], // 1 idle
 					["MMM-MVG","MMM-LiveLyrics", "MMM-OpenWeatherMapForecast"] // 2 now playing
 				],
-				fixed: ["clock", "MMM-KitchenTimer","alert", "updatenotification"],
+				fixed: ["clock", "MMM-KitchenTimer", "alert"],
 				hiddenPages: { gast: ["MMM-GuestWifi"] }
 			}
 		},

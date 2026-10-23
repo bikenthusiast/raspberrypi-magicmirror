@@ -108,8 +108,10 @@ Full installation, from a fresh Raspberry Pi OS image to a running mirror:
 
 ### Built in
 
-`clock`, `newsfeed`, `alert` and `updatenotification` ship with MagicMirror² and need no separate
-repository. They are configured as `fixed` in `MMM-pages`, so they stay visible across all pages.
+`clock`, `newsfeed` and `alert` ship with MagicMirror² and need no separate repository. `clock` and
+`alert` are configured as `fixed` in `MMM-pages`, so they stay visible across all pages. The built-in
+`updatenotification` is disabled: module updates arrive as a weekly pull request instead
+([docs/updates.md](docs/updates.md)).
 
 ---
 

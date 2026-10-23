@@ -22,6 +22,8 @@ The decision behind it: [ADR-010](adr/010-health-check-alerts.md).
 | `disk` | Root file system ≥ 90 % | 1 run | Logs, recordings in `data/` |
 | `magicmirror` | `magicmirror.service` not `active` | 3 runs | Crash, failed start, or stopped by hand |
 | `network` | No ping reply from 1.1.1.1 or 9.9.9.9 | 3 runs | See below: the alert says whether the LAN or only the internet is down |
+| `security-updates` | Debian security updates still pending | 2 days | `unattended-upgrades` not installed or failing; see [updates.md](updates.md) |
+| `os-updates` | Any OS update pending (priority *low*, phone only) | 35 days | The monthly `apt full-upgrade` is overdue |
 
 Every value can be changed with an environment variable (`HEALTH_TEMP_MAX_C`, `HEALTH_MEM_MIN_MB`,
 …, see the top of the script), for example in a drop-in for the service:

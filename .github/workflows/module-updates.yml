@@ -1,0 +1,70 @@
+# Weekly module update check -- see docs/updates.md and ADR-011.
+#
+# Moves the pins of the `follow` modules in modules.txt to upstream's latest
+# commit and opens (or refreshes) one pull request with the commits listed.
+# Nothing reaches the Pi until the PR is merged; deploy.sh then runs
+# bootstrap.sh and rolls back if MagicMirror does not come up.
+#
+# Once, on GitHub: Settings -> Actions -> General -> Workflow permissions ->
+# "Allow GitHub Actions to create and approve pull requests".
+
+name: Module updates
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"     # Mondays 05:17 UTC, before the mirror's 09:00 deploy
+  workflow_dispatch:
+
+permissions:
+  contents: write            # push the bot branch
+  pull-requests: write       # open / update the PR
+  actions: write             # start CI on the bot branch (see below)
+
+concurrency:
+  group: module-updates
+  cancel-in-progress: false
+
+env:
+  BRANCH: bot/module-pins
+
+jobs:
+  bump:
+    name: bump follow pins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check upstreams
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/module-updates.sh --write --report "$RUNNER_TEMP/pr-body.md"
+
+      - name: open or update the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet -- modules.txt; then
+            echo "all follow modules current -- nothing to do"
+            exit 0
+          fi
+          git diff -- modules.txt
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git commit -q -m "modules: bump follow pins ($(date -u +%Y-%m-%d))" -- modules.txt
+          git push -q --force origin "$BRANCH"
+
+          title="Module updates $(date -u +%Y-%m-%d)"
+          pr="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md"
+            echo "updated PR #$pr"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md"
+          fi
+
+          # Pushes and PRs made with GITHUB_TOKEN do not trigger other workflows,
+          # so CI would never run and branch protection would block the merge.
+          # workflow_dispatch is the documented exception: start CI explicitly.
+          gh workflow run ci.yml --ref "$BRANCH"

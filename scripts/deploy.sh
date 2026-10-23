@@ -19,7 +19,12 @@
 #
 # What it never touches: config/secrets.js, guest-wifi.png and anything else
 # that is git-ignored. Installed systemd units are not overwritten -- a change
-# under systemd/ is reported and has to be installed by hand.
+# under systemd/ is reported and has to be installed by hand, as is a change
+# to the OS update config under config/os/.
+#
+# A change to modules.txt or bootstrap.sh runs bootstrap.sh, which moves the
+# third-party modules to their new pins (docs/updates.md). A rollback runs it
+# again with the old modules.txt and so restores the old pins.
 set -euo pipefail
 
 # Run from a private copy: a deployment may update this very file, and bash
@@ -48,8 +53,9 @@ die () { echo "deploy: ERROR: $*" >&2; exit 1; }
 
 # --- what a change means ------------------------------------------------------
 #
-# One line per changed path: "restart <unit>", "user-restart <unit>" or
-# "manual <reason>". Kept as a single function so the mapping is in one place
+# One line per changed path: "bootstrap modules", "restart <unit>",
+# "user-restart <unit>" or "manual <reason>". The sorted plan runs
+# "bootstrap" before any restart. Kept as a single function so the mapping is in one place
 # and can be checked with --plan before it ever runs for real.
 actions_for () {
 	local path="$1"
@@ -63,7 +69,10 @@ actions_for () {
 		systemd/*)
 			echo "manual unit changed: $path -- install it by hand (see the header of the file)" ;;
 		modules.txt|scripts/bootstrap.sh)
-			echo "manual module manifest changed -- run scripts/bootstrap.sh" ;;
+			echo "bootstrap modules"
+			echo "user-restart magicmirror" ;;
+		config/os/*|scripts/setup-os-updates.sh)
+			echo "manual OS update config changed -- run: sudo scripts/setup-os-updates.sh" ;;
 		config/*.example|config/*.example.js)
 			echo "manual template changed: $path -- compare with your local copy" ;;
 		*)
@@ -104,11 +113,21 @@ print(f"{len(runs)} checks green")
 
 # --- restart and smoke test ---------------------------------------------------
 
+# Returns non-zero when bootstrap.sh fails: the modules may be half updated,
+# so the remaining actions are skipped and the caller rolls back. Restart failures are only
+# logged here -- the smoke test catches a service that did not come up.
 apply_actions () {
 	local line
 	while IFS= read -r line; do
 		[[ -z "$line" ]] && continue
 		case "$line" in
+			"bootstrap "*)    log "bootstrap.sh: modules to the pins in modules.txt"
+			                  if BOOTSTRAP_NO_HINTS=1 "$REPO_ROOT/scripts/bootstrap.sh" 2>&1 \
+			                      | sed -e 's/\x1b\[[0-9;]*m//g' -e '/^[[:space:]]*$/d' -e 's/^/deploy:   /'; then
+			                      :
+			                  else
+			                      log "bootstrap.sh failed"; return 1
+			                  fi ;;
 			"user-restart "*) log "restart (user) ${line#user-restart }"
 			                  systemctl --user restart "${line#user-restart }" \
 			                      || log "restart of ${line#user-restart } failed" ;;
@@ -181,7 +200,7 @@ main () {
 		|| { log "origin/$BRANCH is not a fast-forward of ${old:0:7} -- skipping"; exit 0; }
 
 	if [[ -f "$FAILED_FILE" && "$(cat "$FAILED_FILE")" == "$new" ]]; then
-		log "${new:0:7} failed the smoke test before -- waiting for a newer commit (rm $FAILED_FILE to retry)"
+		log "${new:0:7} failed to deploy before -- waiting for a newer commit (rm $FAILED_FILE to retry)"
 		exit 0
 	fi
 
@@ -203,19 +222,33 @@ main () {
 	fi
 
 	git merge --ff-only --quiet "$new"
-	apply_actions "$actions"
+	local since
+	since="$(date '+%Y-%m-%d %H:%M:%S')"
 
-	if smoke_test "$actions"; then
+	if apply_actions "$actions" && smoke_test "$actions"; then
 		log "deployed ${new:0:7}"
 		rm -f "$FAILED_FILE"
+		# The smoke test sees MagicMirror answer, not whether every module works.
+		# After a module update, point at errors a human should look at.
+		if grep -q "^bootstrap " <<<"$actions"; then
+			local errs
+			errs="$(journalctl -t magicmirror --since "$since" --no-pager 2>/dev/null | grep -c "ERROR" || true)"
+			if (( errs > 0 )); then
+				log "modules updated; MagicMirror logged $errs ERROR line(s) since -- journalctl -t magicmirror --since '$since'"
+			else
+				log "modules updated; no ERROR lines from MagicMirror so far"
+			fi
+		fi
 		return 0
 	fi
 
-	log "smoke test failed -- rolling back to ${old:0:7}"
+	log "bootstrap or smoke test failed -- rolling back to ${old:0:7}"
 	mkdir -p "$(dirname "$FAILED_FILE")"
 	echo "$new" > "$FAILED_FILE"
 	git reset --hard --quiet "$old"
-	apply_actions "$(grep -v '^manual ' <<<"$actions" || true)"
+	# Runs bootstrap.sh again if it ran before: modules.txt is the old one now,
+	# so this puts the modules back on their old pins.
+	apply_actions "$(grep -v '^manual ' <<<"$actions" || true)" || log "bootstrap.sh failed during rollback"
 	if smoke_test "$actions"; then
 		log "rolled back to ${old:0:7}; ${new:0:7} needs a look"
 	else

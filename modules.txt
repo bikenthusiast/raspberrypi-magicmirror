@@ -1,6 +1,6 @@
 # Module manifest for bootstrap.sh
 #
-# Format:  <folder> <repo-url> [<commit>]
+# Format:  <folder> <repo-url> [<commit> [follow|hold]]
 #
 # The commit is optional. Without it the default branch is cloned --
 # convenient, but not reproducible. Fill in the hashes once the build
@@ -17,15 +17,22 @@
 #
 # MMM-SpotifyPages and MMM-GuestWifi are not listed -- they live in
 # this repo and are symlinked into place instead.
+#
+# Update policy (docs/updates.md, ADR-011):
+#   follow  scripts/module-updates.sh may move the pin to upstream's latest
+#           commit. The weekly workflow does that and opens a pull request.
+#   hold    only changed by hand: own fork, modules patched by bootstrap.sh,
+#           or upstream known to break this setup. Say why after a #.
+# No policy = hold.
 
-MMM-MVG                     https://github.com/KoblerS/MMM-MVG                     ec7beac
-MMM-RAIN-MAP                https://github.com/jalibu/MMM-RAIN-MAP                 8a2ad88
-MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control           d3041ff
-MMM-pages                   https://github.com/edward-shen/MMM-pages               34a7ccc
-MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe           d15f63e
-MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast f222358
-MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar       4435ff1
-MMM-OnSpotify               https://github.com/Fabrizz/MMM-OnSpotify               1d15588
-MMM-LiveLyrics              https://github.com/Fabrizz/MMM-LiveLyrics              9acf344
-MMM-page-indicator          https://github.com/edward-shen/MMM-page-indicator      c431bb9
-MMM-KitchenTimer            https://github.com/bwente/MMM-KitchenTimer             2a70109
+MMM-MVG                     https://github.com/KoblerS/MMM-MVG                      ec7beac  follow
+MMM-RAIN-MAP                https://github.com/jalibu/MMM-RAIN-MAP                  8a2ad88  follow
+MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control            d3041ff  follow
+MMM-pages                   https://github.com/edward-shen/MMM-pages                34a7ccc  follow
+MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe            d15f63e  hold    # EUMETSAT image URLs are dead upstream as well
+MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast f222358  follow
+MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar        4435ff1  hold    # own fork
+MMM-OnSpotify               https://github.com/Fabrizz/MMM-OnSpotify                1d15588  hold    # node-fetch patch in bootstrap.sh
+MMM-LiveLyrics              https://github.com/Fabrizz/MMM-LiveLyrics               9acf344  hold    # node-fetch patch in bootstrap.sh
+MMM-page-indicator          https://github.com/edward-shen/MMM-page-indicator       c431bb9  follow
+MMM-KitchenTimer            https://github.com/bwente/MMM-KitchenTimer              2a70109  follow

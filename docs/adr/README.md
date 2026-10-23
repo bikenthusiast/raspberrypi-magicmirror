@@ -16,5 +16,6 @@ new record that supersedes the old one.
 | [008](008-edge-event-bridge.md) | Gesture events from pi-edge-ai reach the mirror through a Python bridge service | Proposed |
 | [009](009-pull-based-deployment.md) | CI on GitHub Actions, deployment pulled by the Pi and gated on green CI | Proposed |
 | [010](010-health-check-alerts.md) | A health-check script with alerts on change, not a monitoring stack | Proposed |
+| [011](011-reviewable-updates.md) | Updates arrive as reviewable changes: module pins by pull request, OS security updates only | Proposed |
 
 Template for new records: [`000-template.md`](000-template.md).
