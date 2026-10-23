@@ -26,13 +26,13 @@
 # No policy = hold.
 
 MMM-MVG                     https://github.com/KoblerS/MMM-MVG                      ec7beac  follow
-MMM-RAIN-MAP                https://github.com/jalibu/MMM-RAIN-MAP                  8a2ad88  follow
-MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control            d3041ff  follow
+MMM-RAIN-MAP                https://github.com/jalibu/MMM-RAIN-MAP                  9d220b3  follow
+MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control            f69987a  follow
 MMM-pages                   https://github.com/edward-shen/MMM-pages                34a7ccc  follow
 MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe            d15f63e  hold    # EUMETSAT image URLs are dead upstream as well
 MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast f222358  follow
 MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar        4435ff1  hold    # own fork
 MMM-OnSpotify               https://github.com/Fabrizz/MMM-OnSpotify                1d15588  hold    # node-fetch patch in bootstrap.sh
 MMM-LiveLyrics              https://github.com/Fabrizz/MMM-LiveLyrics               9acf344  hold    # node-fetch patch in bootstrap.sh
-MMM-page-indicator          https://github.com/edward-shen/MMM-page-indicator       c431bb9  follow
+MMM-page-indicator          https://github.com/edward-shen/MMM-page-indicator       bc32579  follow
 MMM-KitchenTimer            https://github.com/bwente/MMM-KitchenTimer              2a70109  follow
