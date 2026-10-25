@@ -60,7 +60,7 @@ die () { echo "deploy: ERROR: $*" >&2; exit 1; }
 actions_for () {
 	local path="$1"
 	case "$path" in
-		modules/*|config/config.js)
+		modules/*|config/config.js|config/custom.css)
 			echo "user-restart magicmirror" ;;
 		scripts/presence.py)
 			echo "restart presence" ;;

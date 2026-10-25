@@ -33,8 +33,17 @@ fixes behaviour.
   schedule ran an hour off: off 21:15, on 06:30); on the evening before a switch it writes the wake-up
   in the RTC's old offset, which would otherwise wake two hours off
   ([docs/hardware.md](docs/hardware.md#daylight-saving-time))
+- **Global stylesheet** `config/custom.css` after Apple's Human Interface Guidelines: black glass, Inter
+  as the one typeface, three label greys from 18.8:1 to 4.6:1, nothing below 28 px, colour only from
+  content. Linked by `bootstrap.sh`; a hand-made `custom.css` on the Pi is kept as
+  `custom.css.local-<date>` ([ADR-012](docs/adr/012-visual-design.md)). Optional package:
+  `fonts-inter-variable`, otherwise Roboto
 
 ### Changed
+
+- Clock without seconds, weather without the "Wetter" header, rain map on a dark grey base map
+- MMM-GuestWifi: caption 36 px instead of 14 px, QR code on `#f2f2f2` with rounded corners
+- `deploy.sh` restarts MagicMirror when `config/custom.css` changes
 
 - `deploy.sh` runs `bootstrap.sh` when `modules.txt` or `bootstrap.sh` changes (was a manual step) and
   restores the old pins on rollback
