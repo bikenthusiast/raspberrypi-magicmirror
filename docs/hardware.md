@@ -284,6 +284,35 @@ systemctl --user restart magicmirror   # only if the calendar still shows the ol
 If the clock is still wrong after this, the Pi has no network: check
 `nmcli device status` and `ping -c3 8.8.8.8` before anything else.
 
+### NTP must stay enabled
+
+The Witty Pi sets the clock once at boot from its RTC. Keeping it accurate
+afterwards, and fixing the RTC after an outage, relies on `systemd-timesyncd`.
+
+**The Witty Pi daemon switches NTP off at every boot.** When the RTC holds a valid
+time, `rtc_to_system` in its `utilities.sh` copies it to the system clock and runs
+`timedatectl set-ntp 0`, which stops and disables timesyncd. That is why
+`systemctl enable --now systemd-timesyncd` on 22.10.2026 had no lasting effect:
+on 25.10. it was disabled again. `scripts/witty-dst.sh` (`witty-dst.timer`, 3 min
+after boot) switches it back on, waits for the sync and then writes the system
+time to the RTC (see [Daylight saving time](#daylight-saving-time)).
+
+```bash
+timedatectl | grep -E "synchronized|NTP service"   # yes / active, 3 min after boot
+systemctl is-enabled systemd-timesyncd              # enabled
+journalctl -t witty-dst -b                          # "switching it on", "NTP-synchronised"
+```
+
+`RTC time: n/a` in `timedatectl` is normal: the Witty Pi's clock is not a kernel
+RTC device and is only reached through `wittyPi.sh`.
+
+A side effect of a disabled timesyncd: until the Witty Pi software sets the clock,
+early boot uses the modification time of `/var/lib/systemd/timesync/clock`, and
+only timesyncd updates that file. With the service off, every boot begins at the
+same old time in the journal. Seen on 22.10.2026: all boots in
+`journalctl --list-boots` started at 19.10. 09:17, so the start column and the first
+kernel lines of each boot were useless for finding when the Pi was switched on.
+
 ### Daylight saving time
 
 Three things go wrong at a DST change without help (worked out on 25.10.2026 from the Witty Pi 4.23
@@ -303,7 +332,7 @@ sources):
 
 | When | Unit | What |
 |---|---|---|
-| 3 min after boot | `witty-dst.timer` | once NTP has synchronised: write the system time to the RTC if they differ by more than 10 s (2, and drift); move `BEGIN` to today if its offset is not today's, and re-run `runScript.sh` (1) |
+| 3 min after boot | `witty-dst.timer` | switch NTP back on (the Witty Pi daemon turns it off at boot), wait for the sync, write the system time to the RTC if they differ by more than 10 s (2, and drift); move `BEGIN` to today if its offset is not today's, and re-run `runScript.sh` (1) |
 | daily 22:00 | `witty-dst-evening.timer` | if the offset changes before the next 07:30, write the startup alarm in the offset the RTC runs on that night: `08:30` for 07:30 CET in autumn, `06:30` for 07:30 CEST in spring (3). Otherwise nothing |
 
 ```bash
