@@ -191,7 +191,9 @@ ln -sfn "$REPO_ROOT/config/custom.css" "$css_dst"
 echo "    linked config/custom.css"
 
 # The stylesheet asks for Inter; without it Chromium falls back to Roboto.
-if command -v fc-list >/dev/null && ! fc-list : family | grep -q "Inter Variable"; then
+# fc-list filters itself: piping into grep -q would let an early grep exit
+# kill fc-list with SIGPIPE, and pipefail would report an installed font missing.
+if command -v fc-list >/dev/null && [[ -z "$(fc-list 'Inter Variable' family)" ]]; then
 	echo "    ${YELLOW}font missing${NC}: sudo apt install fonts-inter-variable (docs/setup.md, section 5)"
 fi
 

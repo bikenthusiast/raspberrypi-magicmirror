@@ -230,11 +230,14 @@ main () {
 		rm -f "$FAILED_FILE"
 		# The smoke test sees MagicMirror answer, not whether every module works.
 		# After a module update, point at errors a human should look at.
+		# Only MagicMirror's own "[ERROR]" label counts: Electron's Chromium logs to
+		# the same tag, and on a Pi 4 it reports "...:ERROR:...vaapi_wrapper.cc" at
+		# every start (no VA-API driver for the GPU), which is harmless.
 		if grep -q "^bootstrap " <<<"$actions"; then
 			local errs
-			errs="$(journalctl -t magicmirror --since "$since" --no-pager 2>/dev/null | grep -c "ERROR" || true)"
+			errs="$(journalctl -t magicmirror --since "$since" --no-pager 2>/dev/null | grep -cF "[ERROR]" || true)"
 			if (( errs > 0 )); then
-				log "modules updated; MagicMirror logged $errs ERROR line(s) since -- journalctl -t magicmirror --since '$since'"
+				log "modules updated; MagicMirror logged $errs ERROR line(s) since -- journalctl -t magicmirror --since '$since' | grep -F '[ERROR]'"
 			else
 				log "modules updated; no ERROR lines from MagicMirror so far"
 			fi
