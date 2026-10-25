@@ -43,7 +43,10 @@ let config = {
 		},
 		{
 			module: "clock",
-			position: "top_left"
+			position: "top_left",
+			config: {
+				displaySeconds: false // a ticking digit pulls the eye every second (config/custom.css)
+			}
 		},
 		{
 			module: "newsfeed",
@@ -105,7 +108,7 @@ let config = {
 		{
 			module: "MMM-OpenWeatherMapForecast",
 			position: "top_right",
-			header: "Wetter",
+			// No header: icon and temperature say "weather" on their own.
 			config: {
 				apikey: s.openWeatherApiKey,
 				endpoint: "https://api.openweathermap.org/data/3.0/onecall",
@@ -140,7 +143,7 @@ let config = {
 				displayHoursBeforeRain: 0,
 				extraDelayLastFrameMs: 2000,
 				extraDelayCurrentFrameMs: 5000,
-				invertColors: false,
+				invertColors: true, // dark base map; custom.css greys it so only the radar has colour
 				markers: [
 					{ lat: s.cityLatitude, lng: s.cityLongitude, color: "red" }
 				],

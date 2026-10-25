@@ -176,6 +176,25 @@ for own in MMM-SpotifyPages MMM-GuestWifi; do
 	fi
 done
 
+# The global stylesheet: MagicMirror loads config/custom.css after all
+# module styles. A custom.css that is a real file was made on the Pi by
+# hand -- keep it next to the link instead of overwriting it.
+echo
+echo "==> stylesheet"
+css_dst="$MM_ROOT/config/custom.css"
+if [[ -f "$css_dst" && ! -L "$css_dst" ]]; then
+	mv "$css_dst" "$css_dst.local-$(date +%F)"
+	echo "    ${YELLOW}kept${NC} the previous custom.css as custom.css.local-$(date +%F)"
+fi
+mkdir -p "$MM_ROOT/config"
+ln -sfn "$REPO_ROOT/config/custom.css" "$css_dst"
+echo "    linked config/custom.css"
+
+# The stylesheet asks for Inter; without it Chromium falls back to Roboto.
+if command -v fc-list >/dev/null && ! fc-list : family | grep -q "Inter Variable"; then
+	echo "    ${YELLOW}font missing${NC}: sudo apt install fonts-inter-variable (docs/setup.md, section 5)"
+fi
+
 # --- 4. Summary ------------------------------------------------------
 
 # A non-zero exit lets deploy.sh roll back instead of starting a broken module.

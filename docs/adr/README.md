@@ -17,5 +17,6 @@ new record that supersedes the old one.
 | [009](009-pull-based-deployment.md) | CI on GitHub Actions, deployment pulled by the Pi and gated on green CI | Proposed |
 | [010](010-health-check-alerts.md) | A health-check script with alerts on change, not a monitoring stack | Proposed |
 | [011](011-reviewable-updates.md) | Updates arrive as reviewable changes: module pins by pull request, OS security updates only | Proposed |
+| [012](012-visual-design.md) | One global stylesheet after Apple's design guidelines: black glass, one typeface, colour from content | Proposed |
 
 Template for new records: [`000-template.md`](000-template.md).

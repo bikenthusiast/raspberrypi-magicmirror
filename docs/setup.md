@@ -246,7 +246,7 @@ sudo apt install -y \
   git tmux qrencode \
   i2c-tools v4l-utils \
   python3-gpiozero python3-lgpio \
-  kanshi
+  kanshi fonts-inter-variable
 ```
 
 | Package | Needed for |
@@ -256,6 +256,7 @@ sudo apt install -y \
 | `python3-gpiozero`, `python3-lgpio` | reading the radar sensor |
 | `kanshi` | display rotation |
 | `qrencode` | generating the guest WiFi QR code |
+| `fonts-inter-variable` | the mirror's typeface, used by `config/custom.css` ([ADR-012](adr/012-visual-design.md)) |
 
 ---
 
@@ -636,8 +637,8 @@ journalctl -t magicmirror -b | grep -A 12 "secrets.js" | tail -15
 
 > [!CAUTION]
 > Easy to forget. Without these MagicMirror finds neither the configuration nor
-> the two custom modules. `bootstrap.sh` handles the modules; the config is
-> manual.
+> the two custom modules. `bootstrap.sh` handles the modules and the stylesheet
+> `config/custom.css`; the config is manual.
 >
 > On 14.09 both module symlinks were missing because `bootstrap.sh` was not
 > run. The mirror started and looked fine — Spotify simply never switched
@@ -655,7 +656,7 @@ ln -sfn ~/Projects/raspberrypi-magicmirror/config/config.js \
 Verify:
 
 ```bash
-ls -lL ~/Projects/MagicMirror/config/config.js
+ls -lL ~/Projects/MagicMirror/config/config.js ~/Projects/MagicMirror/config/custom.css
 node -e "require('$HOME/Projects/MagicMirror/config/config.js')"
 ```
 
