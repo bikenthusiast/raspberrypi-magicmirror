@@ -17,9 +17,11 @@
 #
 # What this script does:
 #
-#   after boot (default)  once NTP has synchronised the system clock: write it
-#                         to the RTC if they differ by more than 10 s (fixes 2,
-#                         and drift); move BEGIN to today if its UTC offset is
+#   after boot (default)  switch NTP back on (the Witty Pi daemon turns it off
+#                         at every boot when it copies the RTC to the system
+#                         clock, `timedatectl set-ntp 0` in rtc_to_system), wait
+#                         for the sync, then write the system time to the RTC
+#                         if they differ by more than 10 s (fixes 2, and drift); move BEGIN to today if its UTC offset is
 #                         not today's and re-run runScript.sh (fixes 1).
 #   --evening             if the offset changes between now and the next
 #                         startup (BEGIN's time of day, tomorrow), rewrite the
@@ -79,16 +81,28 @@ now_off="$(date -d "@$now" +%z)"
 
 sync_rtc () {
 	if [[ "$ASSUME_NTP" != "1" ]]; then
-		local _
-		for _ in $(seq 1 24); do
-			[[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" == "yes" ]] && break
-			[[ "$mode" == "check" ]] && break
-			sleep 5
-		done
+		if [[ "$(timedatectl show -p NTP --value 2>/dev/null)" != "yes" ]]; then
+			if [[ "$mode" == "check" ]]; then
+				log "NTP is off (the Witty Pi daemon switches it off at boot) -- would switch it on"
+			else
+				log "NTP is off (the Witty Pi daemon switches it off at boot) -- switching it on"
+				timedatectl set-ntp true
+			fi
+		fi
+		if [[ "$mode" != "check" && "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" != "yes" ]]; then
+			log "waiting up to 2 min for NTP to synchronise the system clock ..."
+			local _
+			for _ in $(seq 1 24); do
+				[[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" == "yes" ]] && break
+				sleep 5
+			done
+		fi
 		if [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" != "yes" ]]; then
 			log "system clock not NTP-synchronised -- leaving the RTC alone"
 			return 0
 		fi
+		log "system clock NTP-synchronised"
+		now="${WITTY_DST_NOW:-$(date +%s)}"
 	fi
 	local rtc sys delta
 	rtc="$(witty get_rtc_timestamp 2>/dev/null || true)"
