@@ -28,6 +28,12 @@ fixes behaviour.
   - Health check: `os_updates=`, `sec=`, `reboot=` in every line; alerts when security updates stall for
     2 days and, phone only, when the manual OS update is 35 days overdue
 
+- `scripts/witty-dst.sh` with `systemd/witty-dst*.timer`: keeps the Witty Pi schedule on local time
+  across DST changes. After boot it re-syncs the RTC and moves `BEGIN` into the current offset (the
+  schedule ran an hour off: off 21:15, on 06:30); on the evening before a switch it writes the wake-up
+  in the RTC's old offset, which would otherwise wake two hours off
+  ([docs/hardware.md](docs/hardware.md#daylight-saving-time))
+
 ### Changed
 
 - `deploy.sh` runs `bootstrap.sh` when `modules.txt` or `bootstrap.sh` changes (was a manual step) and

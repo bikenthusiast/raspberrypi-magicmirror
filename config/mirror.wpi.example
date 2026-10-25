@@ -13,6 +13,9 @@
 #     already due and power the Pi down on the spot.
 #   - The file must sit in ~/Projects/wittypi/schedules/, or menu item 6
 #     does not offer it.
+#   - The cycle counts from BEGIN in UTC: each DST change shifts it by an
+#     hour. scripts/witty-dst.sh (witty-dst*.timer) moves BEGIN after a
+#     change and corrects the wake-up on the evening before.
 
 BEGIN   2026-01-01 07:30:00
 END     2035-12-31 23:59:59

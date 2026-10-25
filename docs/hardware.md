@@ -284,29 +284,45 @@ systemctl --user restart magicmirror   # only if the calendar still shows the ol
 If the clock is still wrong after this, the Pi has no network: check
 `nmcli device status` and `ping -c3 8.8.8.8` before anything else.
 
-### NTP must stay enabled
+### Daylight saving time
 
-The Witty Pi sets the clock once at boot from its RTC. Keeping it accurate
-afterwards, and fixing the RTC after an outage, relies on `systemd-timesyncd`.
-It has to be **enabled**, not only running: `systemctl restart` starts a disabled
-service until the next reboot and leaves it off after that.
+Three things go wrong at a DST change without help (worked out on 25.10.2026 from the Witty Pi 4.23
+sources):
+
+1. **BEGIN keeps its offset.** `runScript.sh` turns `BEGIN` into a timestamp with the UTC offset of the
+   `BEGIN` *date* and adds fixed 24 h cycles. A `BEGIN` in summer time keeps meaning 07:30 CEST: in winter
+   `wittyPi.sh` shows "next shutdown 21:15, next startup 06:30" (seen 25.10.2026), in spring 23:15 / 08:30.
+2. **The RTC knows no DST.** It keeps plain wall-clock time. The Witty Pi software rewrites it from the
+   system clock only when it is invalid or on request (menu item 1), so across the switch night it runs on
+   the old offset.
+3. **The alarm for the morning after is two hours off.** It is written the day before as new-offset wall
+   time but compared against the RTC's old offset: wake at 05:30 instead of 07:30 in autumn, 09:30 in
+   spring.
+
+[`scripts/witty-dst.sh`](../scripts/witty-dst.sh) covers all three:
+
+| When | Unit | What |
+|---|---|---|
+| 3 min after boot | `witty-dst.timer` | once NTP has synchronised: write the system time to the RTC if they differ by more than 10 s (2, and drift); move `BEGIN` to today if its offset is not today's, and re-run `runScript.sh` (1) |
+| daily 22:00 | `witty-dst-evening.timer` | if the offset changes before the next 07:30, write the startup alarm in the offset the RTC runs on that night: `08:30` for 07:30 CET in autumn, `06:30` for 07:30 CEST in spring (3). Otherwise nothing |
 
 ```bash
-systemctl is-enabled systemd-timesyncd   # enabled
-timedatectl                              # "System clock synchronized: yes", "NTP service: active"
-sudo systemctl enable --now systemd-timesyncd   # if either is not the case
+sudo cp systemd/witty-dst*.service systemd/witty-dst*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now witty-dst.timer witty-dst-evening.timer
+sudo scripts/witty-dst.sh --check     # RTC, BEGIN and tonight's alarm; changes nothing
+sudo scripts/witty-dst.sh             # fix now instead of after the next boot
+journalctl -t witty-dst               # what it did
 ```
 
-`RTC time: n/a` in `timedatectl` is normal: the Witty Pi's clock is not a kernel
-RTC device and is only reached through `wittyPi.sh`.
+On the evening before a switch `wittyPi.sh` shows the corrected startup in RTC time ("next startup
+[25 08:30:00]" for 07:30 CET) — intended. The next morning the Witty Pi daemon briefly sets the system
+clock from the RTC, one hour off, until NTP corrects it; three minutes later `witty-dst.sh` rewrites the
+RTC. Tested against UUGear's `runScript.sh` with a simulated RTC through both switch nights of 2026/27.
 
-A side effect of a disabled timesyncd: until the Witty Pi software sets the clock,
-early boot uses the modification time of `/var/lib/systemd/timesync/clock`, and
-only timesyncd updates that file. With the service off, every boot begins at the
-same old time in the journal. Seen on 22.10.2026: all boots in
-`journalctl --list-boots` started at 19.10. 09:17, so the start column and the first
-kernel lines of each boot were useless for finding when the Pi was switched on.
-The time from the Witty Pi itself was correct throughout.
+The 22:00 run assumes the schedule of `config/mirror.wpi.example`: daily, switch-on at `BEGIN`'s time of
+day, switch-off after 22:00. Moving the switch-off earlier means moving `witty-dst-evening.timer` too.
+`schedules/mirror.wpi` keeps its old `BEGIN`; selecting it again in the menu is corrected at the next boot.
 
 ---
 

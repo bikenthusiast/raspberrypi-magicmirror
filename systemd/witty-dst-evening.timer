@@ -1,0 +1,12 @@
+# Runs witty-dst-evening.service daily at 22:00, before the 22:15 shutdown of
+# config/mirror.wpi.example. Move it if the schedule's switch-off moves.
+# No Persistent=: a run missed while the Pi was off has nothing to correct.
+
+[Unit]
+Description=Check for a DST change before tonight's shutdown
+
+[Timer]
+OnCalendar=*-*-* 22:00
+
+[Install]
+WantedBy=timers.target
