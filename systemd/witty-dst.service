@@ -1,17 +1,18 @@
 # Keeps the Witty Pi schedule on local time across DST changes -- see
-# scripts/witty-dst.sh and docs/hardware.md. Started by witty-dst.timer.
+# scripts/witty-dst.sh and docs/hardware.md. After boot: RTC against the
+# system clock, BEGIN in today's UTC offset. Started by witty-dst.timer.
 #
-# Install (system units, like presence.service):
-#   sudo cp systemd/witty-dst.service systemd/witty-dst.timer /etc/systemd/system/
+# Install (system units, like presence.service), together with the evening pair:
+#   sudo cp systemd/witty-dst*.service systemd/witty-dst*.timer /etc/systemd/system/
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now witty-dst.timer
+#   sudo systemctl enable --now witty-dst.timer witty-dst-evening.timer
 #
 # Logs:
 #   journalctl -t witty-dst
 
 [Unit]
 Description=Re-anchor the Witty Pi schedule after a DST change
-After=time-sync.target
+After=time-sync.target systemd-timesyncd.service
 
 [Service]
 Type=oneshot

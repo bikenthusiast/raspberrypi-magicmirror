@@ -1,0 +1,15 @@
+# Evening half of scripts/witty-dst.sh: if a DST change falls before the next
+# startup, writes the wake-up alarm in the offset the RTC still runs on that
+# night. Does nothing on the other 363 evenings. Started by witty-dst-evening.timer.
+# Install: see witty-dst.service.
+#
+# Logs:
+#   journalctl -t witty-dst
+
+[Unit]
+Description=Correct the Witty Pi wake-up alarm before a DST change
+
+[Service]
+Type=oneshot
+ExecStart=/home/tobiask/Projects/raspberrypi-magicmirror/scripts/witty-dst.sh --evening
+SyslogIdentifier=witty-dst

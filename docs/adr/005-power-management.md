@@ -44,8 +44,9 @@ The schedule is versioned as [`config/mirror.wpi.example`](../../config/mirror.w
 - Occupied pins: GPIO 2, 3 (I²C), 4, 17, plus monitoring of GPIO 14 (TXD). 1-Wire must stay off, since
   it claims GPIO 4 and makes the Pi shut down right after every boot.
 - Schedule pitfalls, all hit in practice: ON + OFF must add up to 24 h; a `BEGIN` date in the past
-  made the script shut the Pi down immediately on 2026-09-07; and the schedule counts in UTC from
-  `BEGIN`, so every DST change shifts it by an hour (2026-10-25) — corrected after boot by
-  `scripts/witty-dst.sh` (see [`docs/hardware.md`](../hardware.md#daylight-saving-time)).
+  made the script shut the Pi down immediately on 2026-09-07; and DST changes shift
+  the schedule (the cycle counts in UTC from `BEGIN`, the RTC keeps the old offset overnight; 2026-10-25)
+  — handled by `scripts/witty-dst.sh` after boot and on the evening before a switch (see
+  [`docs/hardware.md`](../hardware.md#daylight-saving-time)).
 - The journal must be persistent, otherwise every night erases the logs (see
   [`docs/logging.md`](../logging.md)).
