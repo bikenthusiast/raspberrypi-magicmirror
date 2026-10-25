@@ -284,6 +284,30 @@ systemctl --user restart magicmirror   # only if the calendar still shows the ol
 If the clock is still wrong after this, the Pi has no network: check
 `nmcli device status` and `ping -c3 8.8.8.8` before anything else.
 
+### Daylight saving time
+
+The Witty Pi's `runScript.sh` turns `BEGIN` into a timestamp with the UTC offset of the `BEGIN` *date*
+and then adds fixed 24 h cycles. A `BEGIN` in summer time keeps meaning "07:30 CEST": after the switch
+to winter time the mirror goes off at 21:15 and on at 06:30, in spring at 23:15 and 08:30. Seen on
+25.10.2026 — `wittyPi.sh` showed the right time but "next shutdown 21:15, next startup 06:30".
+
+`scripts/witty-dst.sh` fixes it: if the offset of `BEGIN` differs from today's, it moves `BEGIN` to today
+(same time of day) and runs `runScript.sh` again. `witty-dst.timer` runs it three minutes after every
+boot; on all other days it only logs that nothing is to do.
+
+```bash
+sudo cp systemd/witty-dst.service systemd/witty-dst.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now witty-dst.timer
+scripts/witty-dst.sh --check          # report only
+sudo scripts/witty-dst.sh             # fix now instead of after the next boot
+journalctl -t witty-dst               # what it did
+```
+
+One morning a year stays off: on the day of the switch the Pi wakes at the old time (06:30 in autumn,
+08:30 in spring), because that alarm was written the evening before. From then on the times are right.
+`schedules/mirror.wpi` keeps its old `BEGIN`; selecting it again in the menu is corrected at the next boot.
+
 ### NTP must stay enabled
 
 The Witty Pi sets the clock once at boot from its RTC. Keeping it accurate

@@ -1,0 +1,12 @@
+# Runs witty-dst.service three minutes after every boot: after the Witty Pi
+# daemon has run its schedule script (right at boot) and after NTP, so the
+# date and UTC offset are right. See scripts/witty-dst.sh.
+
+[Unit]
+Description=Check the Witty Pi schedule for a DST change after boot
+
+[Timer]
+OnBootSec=3min
+
+[Install]
+WantedBy=timers.target

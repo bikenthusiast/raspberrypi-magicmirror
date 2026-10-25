@@ -28,6 +28,10 @@ fixes behaviour.
   - Health check: `os_updates=`, `sec=`, `reboot=` in every line; alerts when security updates stall for
     2 days and, phone only, when the manual OS update is 35 days overdue
 
+- `scripts/witty-dst.sh` with `systemd/witty-dst.timer`: after a DST change the Witty Pi schedule ran an
+  hour off (off 21:15, on 06:30); the script moves `BEGIN` into the current offset and reschedules
+  ([docs/hardware.md](docs/hardware.md#daylight-saving-time))
+
 ### Changed
 
 - `deploy.sh` runs `bootstrap.sh` when `modules.txt` or `bootstrap.sh` changes (was a manual step) and
