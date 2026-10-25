@@ -28,7 +28,7 @@
 MMM-MVG                     https://github.com/KoblerS/MMM-MVG                      ec7beac  follow
 MMM-RAIN-MAP                https://github.com/jalibu/MMM-RAIN-MAP                  9d220b3  follow
 MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control            f69987a  follow
-MMM-pages                   https://github.com/edward-shen/MMM-pages                34a7ccc  follow
+MMM-pages                   https://github.com/edward-shen/MMM-pages                34a7ccc  hold    # hiddenOnStartup patch in bootstrap.sh
 MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe            d15f63e  hold    # EUMETSAT image URLs are dead upstream as well
 MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast f222358  follow
 MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar        4435ff1  hold    # own fork

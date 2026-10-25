@@ -30,7 +30,7 @@ The fourth column of [`modules.txt`](../modules.txt):
 
 - **`follow`** — the weekly workflow may move the pin to the newest commit on upstream's default branch.
 - **`hold`** — never moved automatically. For your own fork (MMM-MyGCalendar), modules that
-  `bootstrap.sh` patches (MMM-OnSpotify, MMM-LiveLyrics), and upstreams known to break this setup
+  `bootstrap.sh` patches (MMM-OnSpotify, MMM-LiveLyrics, MMM-pages), and upstreams known to break this setup
   (MMM-Globe). Put the reason after a `#`; it shows up in the PR.
 
 A line without a policy counts as `hold`.
@@ -63,7 +63,8 @@ scripts/module-updates.sh --write         # move the follow pins in modules.txt
 After the merge, `deploy.sh` (09:00, [CI/CD](cicd/README.md)) sees `modules.txt` changed and
 
 1. runs `bootstrap.sh`: fetches and checks out only the modules whose pin is new, runs `npm install` only
-   where the checked-out commit changed, re-applies the node-fetch patch, checks the patched files parse.
+   where the checked-out commit changed, re-applies the node-fetch and MMM-pages patches, checks the
+   patched files parse.
    Moving a module discards local changes to its tracked files — `npm install` rewrites
    `package-lock.json` in some modules (MMM-Remote-Control), which would otherwise block the checkout;
 2. restarts MagicMirror and waits for it to answer;

@@ -44,12 +44,17 @@ fixes behaviour.
 - Clock without seconds, weather without the "Wetter" header, rain map on a dark grey base map
 - MMM-GuestWifi: caption 36 px instead of 14 px, QR code on `#f2f2f2` with rounded corners
 - `deploy.sh` restarts MagicMirror when `config/custom.css` changes
-
 - `deploy.sh` runs `bootstrap.sh` when `modules.txt` or `bootstrap.sh` changes (was a manual step) and
   restores the old pins on rollback
 - `bootstrap.sh` fetches only modules whose pin is missing, runs `npm install` only where the commit
   changed, and exits non-zero when a patched file does not parse
 - `updatenotification` disabled; removed from the `fixed` modules of MMM-pages
+
+### Fixed
+
+- Rain map stayed hidden in the rain after a visit to the Spotify or guest page: MMM-pages treated any
+  module hidden at start-up as `hiddenOnStartup`. `bootstrap.sh` patches the check, MMM-pages is on
+  `hold` ([docs/setup.md](docs/setup.md#what-the-mmm-pages-patch-does))
 
 ## [2.0.0] — YYYY-MM-DD
 

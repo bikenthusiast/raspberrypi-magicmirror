@@ -505,8 +505,8 @@ cd ~/Projects/raspberrypi-magicmirror
 ./scripts/bootstrap.sh ~/Projects/MagicMirror
 ```
 
-The script clones everything in `modules.txt`, applies the node-fetch patches
-described below, and symlinks the two modules kept in this repo. It is
+The script clones everything in `modules.txt`, applies the node-fetch and
+MMM-pages patches described below, and symlinks the two modules kept in this repo. It is
 idempotent — a second run updates rather than re-cloning.
 
 <details>
@@ -572,6 +572,30 @@ const Headers = globalThis.Headers ?? fetch.Headers;
 Reported upstream as
 [MMM-OnSpotify#116](https://github.com/Fabrizz/MMM-OnSpotify/issues/116). Once
 fixed there, the patch section in `bootstrap.sh` can go.
+
+### What the MMM-pages patch does
+
+MMM-pages remembers every module that is hidden when the page layout starts
+(`DOM_OBJECTS_CREATED`) as "permanently hidden" and never shows it again. It is
+meant for `hiddenOnStartup: true`, but tests `module.hidden`. MMM-RAIN-MAP
+hides itself early when it isn't raining, so after one visit to the Spotify or
+guest page the rain map stays hidden for the rest of the day, rain or not.
+
+`bootstrap.sh` changes the one check to the config flag MagicMirror's loader
+uses itself:
+
+```js
+if (module.data.hiddenOnStartup) {
+```
+
+The symptom, read through MMM-Remote-Control: the map is hidden on page 0 and
+locked only by MMM-pages.
+
+```bash
+node -e 'const s = require(process.env.HOME + "/Projects/raspberrypi-magicmirror/config/secrets.js"); fetch("http://localhost:8080/api/module/MMM-RAIN-MAP", { headers: { Authorization: "apiKey " + s.remoteApiKey } }).then(r => r.json()).then(j => console.log(j.data.map(m => ({ hidden: m.hidden, lockStrings: m.lockStrings }))))'
+```
+
+MMM-pages is on `hold` while the patch is needed.
 
 ---
 
