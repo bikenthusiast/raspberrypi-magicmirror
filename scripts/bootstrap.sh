@@ -9,7 +9,7 @@
 # Exits non-zero when a clone, checkout or npm install fails, or when a
 # patched file does not parse. Moving a module to a new pin discards local
 # changes to its tracked files (package-lock.json rewritten by npm, the
-# node-fetch patch, which is applied again). deploy.sh runs it after modules.txt changes.
+# node-fetch and MMM-pages patches, which are applied again). deploy.sh runs it after modules.txt changes.
 #
 set -euo pipefail
 
@@ -70,7 +70,7 @@ while read -r name url pin _rest; do
 	if [[ -n "${pin:-}" ]]; then
 		# Moving to another commit discards local changes to tracked files:
 		# npm install rewrites package-lock.json in some modules, and the
-		# node-fetch patch below is re-applied anyway. Without --force such a
+		# patches below are re-applied anyway. Without --force such a
 		# change blocks the checkout ("would be overwritten").
 		want="$(git -C "$target" rev-parse --verify --quiet "$pin^{commit}")" \
 			|| { echo "    ${RED}ERROR${NC} $name: commit $pin not found upstream" >&2; exit 1; }
@@ -139,6 +139,44 @@ echo "==> node-fetch patches"
 patch_fetch "$MODULES_DIR/MMM-OnSpotify/utils/SpotifyFetcher.js" "MMM-OnSpotify"
 patch_fetch "$MODULES_DIR/MMM-LiveLyrics/utils/LyricsFetcher.js" "MMM-LiveLyrics"
 
+# --- 2b. Patch MMM-pages: hiddenOnStartup ----------------------------
+#
+# At DOM_OBJECTS_CREATED MMM-pages marks every module that is hidden at
+# that moment as "permanently hidden" and never shows it again. It means
+# hiddenOnStartup, but tests module.hidden -- so it also catches
+# MMM-RAIN-MAP, which hides itself early when it isn't raining. After a
+# trip to the Spotify or guest page the map then stays hidden all day,
+# rain or not, locked only by MMM-pages.
+#
+# The patch tests the config flag MagicMirror's loader uses itself.
+
+patch_pages () {
+	local file="$MODULES_DIR/MMM-pages/MMM-pages.js" label="MMM-pages"
+
+	[[ -f "$file" ]] || {
+		echo "    ${YELLOW}skipped${NC} $label: $file not found"
+		return
+	}
+
+	if grep -q 'if (module.data.hiddenOnStartup) {' "$file"; then
+		echo "    $label: already patched"
+		return
+	fi
+
+	if [[ "$(grep -c '^          if (module.hidden) {$' "$file")" != 1 ]]; then
+		echo "    ${YELLOW}skipped${NC} $label: hidden check not found once, check manually"
+		return
+	fi
+
+	cp "$file" "$file.orig"
+	sed -i 's|^          if (module.hidden) {$|          if (module.data.hiddenOnStartup) {|' "$file"
+	echo "    ${GREEN}patched${NC} $label (backup at $(basename "$file").orig)"
+}
+
+echo
+echo "==> MMM-pages patch"
+patch_pages
+
 # A half-applied patch leaves `const Headers;` without an initializer,
 # which surfaces as "Missing initializer in const declaration" in the
 # MagicMirror log -- naming neither file nor line.
@@ -147,7 +185,8 @@ echo "==> verifying patched files"
 errors=0
 for f in \
 	"$MODULES_DIR/MMM-OnSpotify/utils/SpotifyFetcher.js" \
-	"$MODULES_DIR/MMM-LiveLyrics/utils/LyricsFetcher.js"
+	"$MODULES_DIR/MMM-LiveLyrics/utils/LyricsFetcher.js" \
+	"$MODULES_DIR/MMM-pages/MMM-pages.js"
 do
 	[[ -f "$f" ]] || continue
 	if node --check "$f" 2>/dev/null; then
