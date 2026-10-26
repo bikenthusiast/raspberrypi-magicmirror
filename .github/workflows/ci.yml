@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck
-        run: shellcheck -S warning scripts/*.sh .githooks/pre-commit docs/demo/*.sh
+        run: shellcheck -S warning scripts/*.sh .githooks/pre-commit docs/demo/*.sh docs/demo/render/*.sh
 
   python:
     name: python (ruff + pytest)
@@ -62,7 +62,7 @@ jobs:
           node-version: "24"       # NodeSource 24.x on the Pi (docs/setup.md)
       - name: syntax
         run: |
-          for f in modules/*/*.js config/*.js tests/js/*.js; do
+          for f in modules/*/*.js config/*.js tests/js/*.js docs/demo/render/*.js; do
             node --check "$f"
           done
       - name: config loads with the example secrets

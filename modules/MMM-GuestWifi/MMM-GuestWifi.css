@@ -19,8 +19,10 @@
 .guestwifi-code {
 	/* Light border: QR codes need a bright quiet zone,
 	   otherwise many cameras fail to scan on a black background.
-	   #f2f2f2 instead of #fff: still 18.8:1 against the modules, less glare. */
-	background-color: var(--mirror-label, #f2f2f2);
+	   The PNG's own margin is #fff, so the border is #fff too and the filter
+	   dims both to #f2f2f2 together: less glare, still 18.8:1, no seam. */
+	background-color: #fff;
+	filter: brightness(0.95);
 	padding: var(--mirror-space-3, 24px);
 	border-radius: var(--mirror-radius, 28px);
 	display: block;
