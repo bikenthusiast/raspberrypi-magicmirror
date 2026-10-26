@@ -1,0 +1,143 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//raspberrypi-magicmirror//demo calendar//DE
+X-WR-CALNAME:Demo
+X-DEMO-NOTE:Demo appointments for render.sh, served by mock-backend.js.
+X-DEMO-NOTE:CATEGORIES picks the feed: personal, claude, sport or kultur (config.js).
+X-DEMO-NOTE:Times are relative to the render, so the calendar is never empty:
+X-DEMO-NOTE:  {now+90m}      90 minutes from now, on the quarter hour, kept within today
+X-DEMO-NOTE:  {day+2 09:00}  the day after tomorrow at 09:00
+X-DEMO-NOTE:  {day+13}       a date, for all-day events (DTSTART;VALUE=DATE)
+BEGIN:VEVENT
+CATEGORIES:claude
+SUMMARY:README aktualisieren
+DTSTART:{now+30m}
+DTEND:{now+60m}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:personal
+SUMMARY:Kaffee mit Lena
+DTSTART:{now+90m}
+DTEND:{now+150m}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:sport
+SUMMARY:Lauf – lang
+DTSTART:{now+180m}
+DTEND:{now+240m}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:personal
+SUMMARY:Abendessen bei Mama
+DTSTART:{now+270m}
+DTEND:{now+360m}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:claude
+SUMMARY:Standup
+DTSTART:{day+1 09:30}
+DTEND:{day+1 09:45}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:sport
+SUMMARY:Gym – Kraft
+DTSTART:{day+1 18:00}
+DTEND:{day+1 19:15}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:personal
+SUMMARY:Zahnarzt
+DTSTART:{day+2 09:00}
+DTEND:{day+2 10:00}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:claude
+SUMMARY:Standup
+DTSTART:{day+2 09:30}
+DTEND:{day+2 09:45}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:claude
+SUMMARY:Standup
+DTSTART:{day+3 09:30}
+DTEND:{day+3 09:45}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:kultur
+SUMMARY:Staatsoper
+DTSTART:{day+3 19:30}
+DTEND:{day+3 22:30}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:sport
+SUMMARY:Gym – Kraft
+DTSTART:{day+4 18:00}
+DTEND:{day+4 19:15}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:personal
+SUMMARY:Wohnungsübergabe
+DTSTART:{day+5 11:00}
+DTEND:{day+5 12:00}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:sport
+SUMMARY:Rennrad Starnberger See
+DTSTART:{day+6 10:00}
+DTEND:{day+6 13:00}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:kultur
+SUMMARY:Pinakothek
+DTSTART;VALUE=DATE:{day+7}
+DTEND;VALUE=DATE:{day+8}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:claude
+SUMMARY:Standup
+DTSTART:{day+8 09:30}
+DTEND:{day+8 09:45}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:claude
+SUMMARY:Sprint Planning
+DTSTART:{day+8 13:00}
+DTEND:{day+8 14:30}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:claude
+SUMMARY:Standup
+DTSTART:{day+9 09:30}
+DTEND:{day+9 09:45}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:personal
+SUMMARY:Kino
+DTSTART:{day+9 20:00}
+DTEND:{day+9 22:30}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:sport
+SUMMARY:Gym – Kraft
+DTSTART:{day+11 18:00}
+DTEND:{day+11 19:15}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:kultur
+SUMMARY:Lesung Literaturhaus
+DTSTART:{day+12 20:00}
+DTEND:{day+12 21:30}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:personal
+SUMMARY:Geburtstag Lena
+DTSTART;VALUE=DATE:{day+13}
+DTEND;VALUE=DATE:{day+14}
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:personal
+SUMMARY:Wochenende am Tegernsee
+DTSTART;VALUE=DATE:{day+15}
+DTEND;VALUE=DATE:{day+18}
+END:VEVENT
+END:VCALENDAR

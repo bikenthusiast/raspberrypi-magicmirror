@@ -38,9 +38,14 @@ fixes behaviour.
   content. Linked by `bootstrap.sh`; a hand-made `custom.css` on the Pi is kept as
   `custom.css.local-<date>` ([ADR-012](docs/adr/012-visual-design.md)). Optional package:
   `fonts-inter-variable`, otherwise Roboto
+- `docs/demo/render/render.sh`: renders the README screenshots and the demo GIF from `config/config.js` in
+  headless Chrome, on a throwaway MagicMirror built by `bootstrap.sh`, with a demo backend in place of the
+  secrets; appointments from `docs/demo/render/demo-calendar.ics`, times relative to the render
 
 ### Changed
 
+- README: current pages, modules and operations, a design section; screenshots and GIF in the new design
+  (`demo_magicmirror.gif` replaces `demo_magicmirror_rot.gif`)
 - Clock without seconds, weather without the "Wetter" header, rain map on a dark grey base map
 - MMM-GuestWifi: caption 36 px instead of 14 px, QR code on `#f2f2f2` with rounded corners
 - `deploy.sh` restarts MagicMirror when `config/custom.css` changes
@@ -52,6 +57,8 @@ fixes behaviour.
 
 ### Fixed
 
+- Guest page: the QR code's white margin showed as a lighter square inside the `#f2f2f2` border; border
+  and code are now dimmed together
 - Rain map stayed hidden in the rain after a visit to the Spotify or guest page: MMM-pages treated any
   module hidden at start-up as `hiddenOnStartup`. `bootstrap.sh` patches the check, MMM-pages is on
   `hold` ([docs/setup.md](docs/setup.md#what-the-mmm-pages-patch-does))
