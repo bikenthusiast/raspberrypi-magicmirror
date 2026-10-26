@@ -35,6 +35,14 @@ const COVER_COLOURS = {
 	"--ONSP-VIBRANT-DOMINANTBRIGHT": "#dfe8d2", "--ONSP-VIBRANT-DOMINANTDARK": "#1d2a14"
 };
 
+// The track from the README credits: Josh Woodward, CC BY 4.0
+// (https://www.joshwoodward.com/). Its lyrics are not reproduced here --
+// the mirror fetches them live; the demo shows placeholder lines.
+const TRACK = {
+	name: "I'll Be Right Behind You, Josephine",
+	artist: "Josh Woodward"
+};
+
 const LYRICS = [
 	"Hier laufen die Lyrics zum Song,",
 	"Zeile für Zeile, groß und fett,",
@@ -70,19 +78,19 @@ async function warmUp (page) {
 }
 
 async function startPlayback (page) {
-	await page.evaluate(async (cover, colours, lyrics) => {
+	await page.evaluate(async (cover, colours, lyrics, song) => {
 		for (const [k, v] of Object.entries(colours)) document.documentElement.style.setProperty(k, v);
 		const lily = MM.getModules().find((m) => m.name === "MMM-LiveLyrics");
 		// Its helper would answer "no lyrics" for the demo token; keep only ours
 		const original = lily.socketNotificationReceived.bind(lily);
 		lily.socketNotificationReceived = (n, p) => (n === "LYRICS" && !(p && p.demo) ? undefined : original(n, p));
-		const track = { playerIsEmpty: false, isPlaying: true, uri: "spotify:track:demo", name: "Demo-Titel", artist: "Demo-Band", artists: "Demo-Band", image: cover };
+		const track = { playerIsEmpty: false, isPlaying: true, uri: "spotify:track:demo", name: song.name, artist: song.artist, artists: song.artist, image: cover };
 		MM.getModules().find((m) => m.name === "clock").sendNotification("NOW_PLAYING", track);
 		await new Promise((r) => setTimeout(r, 400));
 		lily.upstreamNotFound = false;
 		lily.onSpotifyVersionMismatch = null;
 		lily.socketNotificationReceived("LYRICS", { demo: true, uri: track.uri, lyrics });
-	}, `${mock}/cover.svg`, COVER_COLOURS, LYRICS);
+	}, `${mock}/cover.svg`, COVER_COLOURS, LYRICS, TRACK);
 }
 
 async function main () {
@@ -115,7 +123,7 @@ async function main () {
 		console.log("pass 2: tour");
 		await warmUp(page);
 		const recorder = await page.screencast({ path: videoPath, scale: 0.3125 });
-		await sleep(3500);
+		await sleep(5500);  // the calendar page is the one with the most to read
 		await send(page, "PAGE_CHANGED", 1);
 		await sleep(3500);
 		await startPlayback(page);

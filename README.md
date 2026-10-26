@@ -19,8 +19,9 @@ What makes it more than a dashboard is that the display reacts to state instead 
 Pages 0 and 1 rotate slowly while nothing is playing. Page 2 appears on its own when playback starts. The guest page is hidden and shown on request.
 The clock, the kitchen timer and system alerts stay on every page. The rain radar joins pages 0 and 1 only while it rains.
 
-<sub>Rendered from this repository's `config/config.js` with demo data for the calendars, weather and news;
-departures and radar are live. Regenerate with [`docs/demo/render/render.sh`](docs/demo/render/render.sh).</sub>
+<sub>Rendered from this repository's `config/config.js` with demo data for the calendars
+([`demo-calendar.ics`](docs/demo/render/demo-calendar.ics)), weather and news; departures and radar are live.
+Regenerate with [`docs/demo/render/render.sh`](docs/demo/render/render.sh).</sub>
 
 ### How the pages are driven
 
@@ -171,7 +172,9 @@ docs/demo/render/render.sh
 
 On the development machine it builds a throwaway MagicMirror with `bootstrap.sh` — the same pins, patches
 and stylesheet as on the Pi — swaps the secrets for a local demo backend, and drives the pages in headless
-Chrome. Needs Chrome, ffmpeg and GNU sed; details in the script's header.
+Chrome. The appointments come from [`demo-calendar.ics`](docs/demo/render/demo-calendar.ics), with times
+relative to the render so the calendar is never empty. Needs Chrome, ffmpeg and GNU sed; details in the
+script's header.
 
 ---
 
@@ -202,6 +205,7 @@ licenses; see the linked repositories.
 
 ## Credits
 
-The track in the 1.0 demo recording [`docs/demo/demo_magicmirror.mp4`](docs/demo/demo_magicmirror.mp4) is
-*I'll Be Right Behind You, Josephine* by [Josh Woodward](https://www.joshwoodward.com/), licensed under
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The rendered demo uses placeholder text.
+The track shown in the demo is *I'll Be Right Behind You, Josephine* by
+[Josh Woodward](https://www.joshwoodward.com/), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The rendered pictures show placeholder lines in
+place of its lyrics, which the mirror loads live.

@@ -11,7 +11,8 @@
 #   2. scripts/bootstrap.sh against it: pinned modules, patches, own modules,
 #      the stylesheet link -- the same steps as on the Pi
 #   3. a config built from config/config.js by demo-config.js, with
-#      mock-backend.js in place of the secrets (weather, calendars, news)
+#      mock-backend.js in place of the secrets: weather, news, and the four
+#      calendars from demo-calendar.ics (edit that file to change the events)
 #   4. capture.js in headless Chrome: one screenshot per page, then the tour
 #   5. ffmpeg turns the tour into docs/demo/gif/demo_magicmirror.gif
 #

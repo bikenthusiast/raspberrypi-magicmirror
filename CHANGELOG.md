@@ -40,7 +40,7 @@ fixes behaviour.
   `fonts-inter-variable`, otherwise Roboto
 - `docs/demo/render/render.sh`: renders the README screenshots and the demo GIF from `config/config.js` in
   headless Chrome, on a throwaway MagicMirror built by `bootstrap.sh`, with a demo backend in place of the
-  secrets
+  secrets; appointments from `docs/demo/render/demo-calendar.ics`, times relative to the render
 
 ### Changed
 

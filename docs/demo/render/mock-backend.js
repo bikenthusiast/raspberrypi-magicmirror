@@ -2,7 +2,8 @@
  *
  *   /owm          OpenWeatherMap One Call 3.0 (MOCK_RAIN=1: raining now, so
  *                 MMM-RAIN-MAP shows up)
- *   /<name>.ics   the four calendars of config.js, relative to today
+ *   /<name>.ics   the four calendars of config.js, from demo-calendar.ics
+ *                 (CATEGORIES picks the feed; times relative to now, see there)
  *   /news.rss     a neutral news feed
  *   /cover.svg    cover art for the now-playing card
  *
@@ -11,9 +12,12 @@
 
 "use strict";
 
+const fs = require("node:fs");
 const http = require("node:http");
+const path = require("node:path");
 
 const PORT = Number(process.argv[2] || 8099);
+const CALENDAR = path.join(__dirname, "demo-calendar.ics");
 const H = 3600, D = 86400;
 
 function owm () {
@@ -51,58 +55,48 @@ const pad = (n) => String(n).padStart(2, "0");
 const stamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
 const day = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 
-function at (dayOffset, hour, minute = 0) {
-	const d = new Date();
-	d.setDate(d.getDate() + dayOffset);
-	d.setHours(hour, minute, 0, 0);
-	return d;
+// Resolves the relative times of demo-calendar.ics:
+//   {now+90m}      now + 90 minutes, rounded up to the quarter hour; kept
+//                  within today so the today panel always has it
+//   {day+2 09:00}  local date and time
+//   {day+13}       date only, for DTSTART;VALUE=DATE
+function resolve (token, property) {
+	let m = token.match(/^now\+(\d+)m$/);
+	if (m) {
+		const d = new Date(Date.now() + Number(m[1]) * 60000);
+		d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0);
+		const limit = new Date();
+		limit.setHours(23, property === "DTEND" ? 59 : 30, 0, 0);
+		return stamp(d < limit ? d : limit);
+	}
+	m = token.match(/^day\+(\d+)(?: (\d\d):(\d\d))?$/);
+	if (m) {
+		const d = new Date();
+		d.setDate(d.getDate() + Number(m[1]));
+		if (m[2] === undefined) return day(d);
+		d.setHours(Number(m[2]), Number(m[3]), 0, 0);
+		return stamp(d);
+	}
+	throw new Error(`demo-calendar.ics: unknown time {${token}}`);
 }
 
-// [summary, days from today, hour (null = all day), minute, minutes long]
-// Today's events sit a few hours ahead, so the today panel is never empty.
-function calendars () {
-	const h = new Date().getHours();
-	const later = (n) => Math.min(h + n, 23);
-	return {
-		personal: [
-			["Kaffee mit Lena", 0, later(1), 30, 60],
-			["Abendessen bei Mama", 0, later(3), 0, 90],
-			["Zahnarzt", 2, 9, 0, 60],
-			["Wohnungsübergabe", 5, 11, 0, 60],
-			["Kino", 9, 20, 0, 150],
-			["Geburtstag Lena", 13, null]
-		],
-		claude: [
-			["README aktualisieren", 0, later(1), 0, 30],
-			["Standup", 1, 9, 30, 15], ["Standup", 2, 9, 30, 15], ["Standup", 3, 9, 30, 15],
-			["Standup", 8, 9, 30, 15], ["Standup", 9, 9, 30, 15], ["Sprint Planning", 8, 13, 0, 90]
-		],
-		sport: [
-			["Lauf – lang", 0, later(2), 0, 60],
-			["Gym – Kraft", 1, 18, 0, 75], ["Gym – Kraft", 4, 18, 0, 75],
-			["Rennrad Starnberger See", 6, 10, 0, 180], ["Gym – Kraft", 11, 18, 0, 75]
-		],
-		kultur: [
-			["Staatsoper", 3, 19, 30, 180],
-			["Pinakothek", 7, null], ["Lesung Literaturhaus", 12, 20, 0, 90]
-		]
-	};
-}
-
-function ics (name, events) {
-	const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//raspberrypi-magicmirror//demo//DE", `X-WR-CALNAME:${name}`];
-	events.forEach(([summary, off, h, m, dur], i) => {
-		lines.push("BEGIN:VEVENT", `UID:${name}-${i}@demo`, `DTSTAMP:${stamp(new Date())}`, `SUMMARY:${summary}`);
-		if (h === null) {
-			lines.push(`DTSTART;VALUE=DATE:${day(at(off, 0))}`, `DTEND;VALUE=DATE:${day(at(off + 1, 0))}`);
-		} else {
-			const s = at(off, h, m);
-			lines.push(`DTSTART:${stamp(s)}`, `DTEND:${stamp(new Date(s.getTime() + dur * 60000))}`);
+// One feed per CATEGORIES value, read fresh on every request
+function ics (feed) {
+	const events = fs.readFileSync(CALENDAR, "utf8").split(/BEGIN:VEVENT\r?\n/).slice(1)
+		.map((block) => block.split(/\r?\nEND:VEVENT/)[0].split(/\r?\n/))
+		.filter((lines) => lines.includes(`CATEGORIES:${feed}`));
+	if (events.length === 0) return null;
+	const out = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//raspberrypi-magicmirror//demo//DE", `X-WR-CALNAME:${feed}`];
+	events.forEach((lines, i) => {
+		out.push("BEGIN:VEVENT", `UID:${feed}-${i}@demo`, `DTSTAMP:${stamp(new Date())}`);
+		for (const line of lines) {
+			const property = line.split(/[;:]/)[0];
+			out.push(line.replace(/\{([^}]+)\}/g, (_, token) => resolve(token, property)));
 		}
-		lines.push("END:VEVENT");
+		out.push("END:VEVENT");
 	});
-	lines.push("END:VCALENDAR");
-	return lines.join("\r\n");
+	out.push("END:VCALENDAR");
+	return out.join("\r\n");
 }
 
 function rss () {
@@ -133,7 +127,7 @@ http.createServer((req, res) => {
 	if (pathname === "/news.rss") return send("application/rss+xml; charset=utf-8", rss());
 	if (pathname === "/cover.svg") return send("image/svg+xml", COVER);
 	const cal = pathname.match(/^\/(\w+)\.ics$/);
-	const all = calendars();
-	if (cal && all[cal[1]]) return send("text/calendar; charset=utf-8", ics(cal[1], all[cal[1]]));
+	const feed = cal && ics(cal[1]);
+	if (feed) return send("text/calendar; charset=utf-8", feed);
 	res.writeHead(404).end();
 }).listen(PORT, () => console.log(`demo backend on http://localhost:${PORT}`));
