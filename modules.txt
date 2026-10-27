@@ -31,7 +31,7 @@ MMM-Remote-Control          https://github.com/Jopyth/MMM-Remote-Control        
 MMM-pages                   https://github.com/edward-shen/MMM-pages                34a7ccc  hold    # hiddenOnStartup patch in bootstrap.sh
 MMM-Globe                   https://github.com/LukeSkywalker92/MMM-Globe            d15f63e  hold    # EUMETSAT image URLs are dead upstream as well
 MMM-OpenWeatherMapForecast  https://github.com/MarcLandis/MMM-OpenWeatherMapForecast f222358  follow
-MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar        4435ff1  hold    # own fork
+MMM-MyGCalendar             https://github.com/bikenthusiast/MMM-MyGCalendar        3aef694  hold    # own fork
 MMM-OnSpotify               https://github.com/Fabrizz/MMM-OnSpotify                1d15588  hold    # node-fetch patch in bootstrap.sh
 MMM-LiveLyrics              https://github.com/Fabrizz/MMM-LiveLyrics               9acf344  hold    # node-fetch patch in bootstrap.sh
 MMM-page-indicator          https://github.com/edward-shen/MMM-page-indicator       bc32579  follow
